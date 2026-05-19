@@ -29,6 +29,24 @@ interface GameStateSnapshot {
   rounds: any[];
 }
 
+export interface GamePreset {
+  id: string;
+  name: string;
+  mode: 'counters' | 'rounds' | 'versus';
+  targetScore: number; // 0 for no limit
+  winCondition: 'highest' | 'lowest';
+  allowNegative?: boolean;
+}
+
+const DEFAULT_PRESETS: GamePreset[] = [
+  { id: 'tally', name: 'Classic Tally', mode: 'counters', targetScore: 0, winCondition: 'highest' },
+  { id: 'nertz', name: 'Nertz', mode: 'rounds', targetScore: 100, winCondition: 'highest' },
+  { id: 'hearts', name: 'Hearts', mode: 'rounds', targetScore: 100, winCondition: 'lowest' },
+  { id: 'scrabble', name: 'Scrabble', mode: 'rounds', targetScore: 0, winCondition: 'highest' },
+  { id: 'golf', name: 'Golf (Cards)', mode: 'rounds', targetScore: 50, winCondition: 'lowest' },
+  { id: 'pingpong', name: 'Ping Pong', mode: 'versus', targetScore: 11, winCondition: 'highest' }
+];
+
 function App() {
   // Screens / Tab Routing
   const [activeTab, setActiveTab] = useState<'counters' | 'rounds' | 'versus' | 'players' | 'analytics'>('players');
@@ -41,6 +59,17 @@ function App() {
   const [scores, setScores] = useState<Record<string, number>>({});
   const [rounds, setRounds] = useState<any[]>([]);
   const [targetScore, setTargetScore] = useState<number>(100);
+
+  // Preset States
+  const [presets, setPresets] = useState<GamePreset[]>(DEFAULT_PRESETS);
+  const [activePreset, setActivePreset] = useState<GamePreset>(DEFAULT_PRESETS[1]); // Default to Nertz
+  const [showPresetModal, setShowPresetModal] = useState<boolean>(false);
+
+  // Custom Preset Form States
+  const [customName, setCustomName] = useState<string>('');
+  const [customMode, setCustomMode] = useState<'counters' | 'rounds' | 'versus'>('rounds');
+  const [customTarget, setCustomTarget] = useState<number>(100);
+  const [customWinCond, setCustomWinCond] = useState<'highest' | 'lowest'>('highest');
   
   // Undo/Redo State stack
   const [undoStack, setUndoStack] = useState<GameStateSnapshot[]>([]);
@@ -75,6 +104,34 @@ function App() {
       setActivePlayerIds(JSON.parse(savedActive));
     } else {
       setActivePlayerIds(['1', '2']);
+    }
+
+    const savedPresets = localStorage.getItem('talli_presets');
+    let loadedPresets = DEFAULT_PRESETS;
+    if (savedPresets) {
+      try {
+        loadedPresets = JSON.parse(savedPresets);
+        setPresets(loadedPresets);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    const savedActivePreset = localStorage.getItem('talli_active_preset');
+    if (savedActivePreset) {
+      try {
+        const parsed = JSON.parse(savedActivePreset) as GamePreset;
+        setActivePreset(parsed);
+        setTargetScore(parsed.targetScore);
+        setActiveTab(parsed.mode);
+      } catch (e) {
+        console.error(e);
+      }
+    } else {
+      const nertzPreset = loadedPresets.find(p => p.id === 'nertz') || loadedPresets[1];
+      setActivePreset(nertzPreset);
+      setTargetScore(nertzPreset.targetScore);
+      setActiveTab(nertzPreset.mode);
     }
 
     const savedTheme = localStorage.getItem('talli_theme');
@@ -183,6 +240,77 @@ function App() {
     setScores(reset);
   };
 
+  // Game rules presets actions
+  const handleSelectPreset = (preset: GamePreset) => {
+    sound.playDing();
+    setActivePreset(preset);
+    localStorage.setItem('talli_active_preset', JSON.stringify(preset));
+    
+    // Switch to appropriate tab
+    setActiveTab(preset.mode);
+    
+    // Set target score in the app
+    setTargetScore(preset.targetScore);
+    
+    // Reset/Setup game scores
+    if (rounds.length > 0 || Object.keys(scores).some(k => scores[k] > 0)) {
+      if (confirm(`Switch to '${preset.name}' and reset current scores?`)) {
+        setRounds([]);
+        const reset: Record<string, number> = {};
+        activePlayerIds.forEach(id => {
+          reset[id] = 0;
+        });
+        setScores(reset);
+      }
+    } else {
+      // Clear history cleanly without prompt since it is empty
+      setRounds([]);
+      const reset: Record<string, number> = {};
+      activePlayerIds.forEach(id => {
+        reset[id] = 0;
+      });
+      setScores(reset);
+    }
+  };
+
+  const handleCreatePreset = (name: string, mode: 'counters' | 'rounds' | 'versus', target: number, winCond: 'highest' | 'lowest') => {
+    const newPreset: GamePreset = {
+      id: 'custom-' + Date.now().toString(),
+      name,
+      mode,
+      targetScore: target,
+      winCondition: winCond
+    };
+    
+    const updatedPresets = [...presets, newPreset];
+    setPresets(updatedPresets);
+    localStorage.setItem('talli_presets', JSON.stringify(updatedPresets));
+    
+    handleSelectPreset(newPreset);
+    setShowPresetModal(false);
+  };
+
+  const handleDeletePreset = (presetId: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent choosing it
+    if (confirm("Delete this custom game ruleset?")) {
+      sound.playUndo();
+      const updated = presets.filter(p => p.id !== presetId);
+      setPresets(updated);
+      localStorage.setItem('talli_presets', JSON.stringify(updated));
+      
+      if (activePreset.id === presetId) {
+        handleSelectPreset(presets[0]);
+      }
+    }
+  };
+
+  const handleSetTargetScore = (newTarget: number) => {
+    setTargetScore(newTarget);
+    const updatedPreset = { ...activePreset, targetScore: newTarget };
+    setActivePreset(updatedPreset);
+    localStorage.setItem('talli_active_preset', JSON.stringify(updatedPreset));
+  };
+
   // Round-based game actions
   const handleAddRound = (roundScores: Record<string, number>) => {
     pushToUndoStack(scores, rounds);
@@ -194,7 +322,7 @@ function App() {
     const nextRounds = [...rounds, newRound];
     setRounds(nextRounds);
 
-    // Check game over win conditions
+    // Calculate dynamic standings totals
     const totals: Record<string, number> = {};
     activePlayerIds.forEach(id => { totals[id] = 0; });
     nextRounds.forEach(r => {
@@ -203,54 +331,67 @@ function App() {
       });
     });
 
-    // Find if anyone exceeded target limit
-    const exceededPlayers = activePlayers.filter(p => (totals[p.id] || 0) >= targetScore);
-    
-    if (exceededPlayers.length > 0) {
-      // Find absolute winner (lowest or highest? Standard in Hearts/Uno is lowest score wins when someone hits limit. Let's make it standard card game rule: lowest score wins!)
-      let absoluteWinner = activePlayers[0];
-      let minVal = totals[absoluteWinner.id] || 0;
+    // Check game over win conditions (only if targetScore is set > 0)
+    if (targetScore > 0) {
+      const exceededPlayers = activePlayers.filter(p => (totals[p.id] || 0) >= targetScore);
+      
+      if (exceededPlayers.length > 0) {
+        // Find absolute winner (lowest or highest based on preset!)
+        let absoluteWinner = activePlayers[0];
+        let winningVal = totals[absoluteWinner.id] || 0;
 
-      activePlayers.forEach(p => {
-        const val = totals[p.id] || 0;
-        if (val < minVal) {
-          minVal = val;
-          absoluteWinner = p;
-        }
-      });
-
-      // Celebrate!
-      setTimeout(() => {
-        confetti({
-          particleCount: 150,
-          spread: 80,
-          origin: { y: 0.65 }
+        activePlayers.forEach(p => {
+          const val = totals[p.id] || 0;
+          if (activePreset.winCondition === 'highest') {
+            if (val > winningVal) {
+              winningVal = val;
+              absoluteWinner = p;
+            }
+          } else {
+            if (val < winningVal) {
+              winningVal = val;
+              absoluteWinner = p;
+            }
+          }
         });
-        sound.playWinFanfare();
-      }, 300);
 
-      // Save stats to historical records
-      const updatedPlayers = players.map(p => {
-        const isActive = activePlayerIds.includes(p.id);
-        if (!isActive) return p;
+        // Celebrate!
+        setTimeout(() => {
+          confetti({
+            particleCount: 150,
+            spread: 80,
+            origin: { y: 0.65 }
+          });
+          sound.playWinFanfare();
+          
+          if (isSpeechOn) {
+            sound.speak(`${absoluteWinner.name} wins the game of ${activePreset.name} with ${winningVal} points!`);
+          }
+        }, 300);
 
-        const isWinner = p.id === absoluteWinner.id;
-        const gameScore = totals[p.id] || 0;
-        const nextPlayed = p.gamesPlayed + 1;
-        const nextWon = p.gamesWon + (isWinner ? 1 : 0);
-        const nextMax = Math.max(p.maxScore, gameScore);
-        const nextAvg = (p.avgScore * p.gamesPlayed + gameScore) / nextPlayed;
+        // Save stats to historical records
+        const updatedPlayers = players.map(p => {
+          const isActive = activePlayerIds.includes(p.id);
+          if (!isActive) return p;
 
-        return {
-          ...p,
-          gamesPlayed: nextPlayed,
-          gamesWon: nextWon,
-          maxScore: nextMax,
-          avgScore: nextAvg
-        };
-      });
+          const isWinner = p.id === absoluteWinner.id;
+          const gameScore = totals[p.id] || 0;
+          const nextPlayed = p.gamesPlayed + 1;
+          const nextWon = p.gamesWon + (isWinner ? 1 : 0);
+          const nextMax = Math.max(p.maxScore, gameScore);
+          const nextAvg = (p.avgScore * p.gamesPlayed + gameScore) / nextPlayed;
 
-      savePlayersToStorage(updatedPlayers);
+          return {
+            ...p,
+            gamesPlayed: nextPlayed,
+            gamesWon: nextWon,
+            maxScore: nextMax,
+            avgScore: nextAvg
+          };
+        });
+
+        savePlayersToStorage(updatedPlayers);
+      }
     }
   };
 
@@ -292,7 +433,7 @@ function App() {
     sound.setSpeechEnabled(nextVal);
     sound.playTick();
     if (nextVal) {
-      sound.speak("Talli: Text-to-speech enabled!");
+      sound.speak("Talli score announcer active!");
     }
   };
 
@@ -322,17 +463,28 @@ function App() {
     return totals;
   };
   const totals = getTotals();
-  const exceededCount = activePlayers.filter(p => (totals[p.id] || 0) >= targetScore).length;
-  const isGameOver = rounds.length > 0 && exceededCount > 0;
+  const exceededCount = targetScore > 0 
+    ? activePlayers.filter(p => (totals[p.id] || 0) >= targetScore).length
+    : 0;
+  const isGameOver = rounds.length > 0 && targetScore > 0 && exceededCount > 0;
   
   const getWinner = () => {
     if (!isGameOver) return null;
     let winner = activePlayers[0];
-    let minScore = totals[winner.id] || 0;
+    let winningScore = totals[winner.id] || 0;
+    
     activePlayers.forEach(p => {
-      if ((totals[p.id] || 0) < minScore) {
-        minScore = totals[p.id] || 0;
-        winner = p;
+      const score = totals[p.id] || 0;
+      if (activePreset.winCondition === 'highest') {
+        if (score > winningScore) {
+          winningScore = score;
+          winner = p;
+        }
+      } else {
+        if (score < winningScore) {
+          winningScore = score;
+          winner = p;
+        }
       }
     });
     return winner;
@@ -366,6 +518,27 @@ function App() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {/* Game Rules Preset Selector */}
+          <button
+            className="btn-premium btn-primary-glow"
+            style={{ 
+              padding: '6px 12px', 
+              fontSize: '12px', 
+              fontWeight: 700, 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '6px',
+              borderRadius: '10px'
+            }}
+            onClick={() => {
+              sound.playTick();
+              setShowPresetModal(true);
+            }}
+            title="Switch Game Rules"
+          >
+            🎮 {activePreset.name}
+          </button>
+
           {/* Undo Global */}
           {undoStack.length > 0 && (
             <button 
@@ -439,7 +612,7 @@ function App() {
             onAddRound={handleAddRound}
             onDeleteLastRound={handleDeleteLastRound}
             onResetGame={handleResetGame}
-            onSetTargetScore={setTargetScore}
+            onSetTargetScore={handleSetTargetScore}
           />
         )}
 
@@ -669,6 +842,178 @@ function App() {
                   A premium, 100% offline-functional scoring app. Created with React, TypeScript, and HTML5 Web Audio synth engines. Compatible with iOS and Android home-screen frameworks.
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* GAME PRESET SELECTION & CREATION MODAL */}
+      {showPresetModal && (
+        <div className="action-sheet-overlay" onClick={() => setShowPresetModal(false)}>
+          <div 
+            className="action-sheet animate-slideup" 
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxHeight: '85vh', overflowY: 'auto' }}
+          >
+            <div className="flex-row-center">
+              <h2>Select Game Rules</h2>
+              <button 
+                className="btn-premium" 
+                style={{ padding: '6px 12px', fontSize: '12px' }}
+                onClick={() => setShowPresetModal(false)}
+              >
+                Close
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '10px' }}>
+              
+              {/* Presets List */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <h3 style={{ fontSize: '13px', color: 'hsl(var(--text-muted))', letterSpacing: '0.5px' }}>GAME PRESETS</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  {presets.map((preset) => {
+                    const isActive = activePreset.id === preset.id;
+                    const isCustom = preset.id.startsWith('custom-');
+                    return (
+                      <div 
+                        key={preset.id}
+                        onClick={() => {
+                          handleSelectPreset(preset);
+                          setShowPresetModal(false);
+                        }}
+                        className={`glass-card ${isActive ? 'btn-primary-glow' : ''}`}
+                        style={{
+                          padding: '12px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '4px',
+                          border: isActive ? '1px solid hsl(var(--accent-primary))' : '1px solid hsl(var(--border-light))',
+                          background: isActive ? 'hsl(var(--accent-primary) / 0.1)' : 'hsl(var(--bg-app) / 0.3)',
+                          position: 'relative'
+                        }}
+                      >
+                        {isCustom && (
+                          <button
+                            onClick={(e) => handleDeletePreset(preset.id, e)}
+                            style={{
+                              position: 'absolute',
+                              top: '4px',
+                              right: '4px',
+                              background: 'transparent',
+                              border: 'none',
+                              color: 'hsl(var(--accent-danger))',
+                              fontSize: '18px',
+                              cursor: 'pointer',
+                              padding: '0 6px',
+                              fontWeight: 'bold',
+                              zIndex: 10
+                            }}
+                            title="Delete Preset"
+                          >
+                            ×
+                          </button>
+                        )}
+                        <strong style={{ fontSize: '14px', color: isActive ? 'hsl(var(--accent-primary))' : 'inherit' }}>
+                          {preset.name}
+                        </strong>
+                        <span style={{ fontSize: '11px', color: 'hsl(var(--text-muted))', textTransform: 'capitalize' }}>
+                          Type: {preset.mode === 'counters' ? 'Tally' : preset.mode === 'rounds' ? 'Rounds' : 'Versus'}
+                        </span>
+                        <span style={{ fontSize: '11px', color: 'hsl(var(--text-secondary))' }}>
+                          {preset.targetScore > 0 ? `Target: ${preset.targetScore} pts` : 'No Limit'} • {preset.winCondition === 'highest' ? 'High Wins' : 'Low Wins'}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Create Custom Preset Form */}
+              <div 
+                className="glass-panel" 
+                style={{ 
+                  padding: '16px', 
+                  background: 'hsl(var(--bg-app) / 0.3)', 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  gap: '12px' 
+                }}
+              >
+                <h3 style={{ fontSize: '13px', color: 'hsl(var(--accent-primary))', letterSpacing: '0.5px' }}>CREATE CUSTOM GAME RULES</h3>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 600 }}>Game Name</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Nertz to 100, Rummy"
+                    className="input-premium"
+                    value={customName}
+                    onChange={(e) => setCustomName(e.target.value)}
+                    style={{ padding: '10px' }}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '12px', fontWeight: 600 }}>Scoring Screen</label>
+                    <select
+                      className="input-premium"
+                      value={customMode}
+                      onChange={(e) => setCustomMode(e.target.value as any)}
+                      style={{ padding: '10px', height: '42px', background: 'hsl(var(--bg-app))', color: 'inherit' }}
+                    >
+                      <option value="rounds">Round-Based</option>
+                      <option value="counters">Quick Counters</option>
+                      <option value="versus">1v1 Split Versus</option>
+                    </select>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '12px', fontWeight: 600 }}>Target Score Limit</label>
+                    <input
+                      type="number"
+                      min="0"
+                      className="input-premium"
+                      value={customTarget}
+                      onChange={(e) => setCustomTarget(Math.max(0, parseInt(e.target.value) || 0))}
+                      style={{ padding: '10px', height: '42px' }}
+                      title="0 means no score limit"
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 600 }}>Win Rule</label>
+                  <select
+                    className="input-premium"
+                    value={customWinCond}
+                    onChange={(e) => setCustomWinCond(e.target.value as any)}
+                    style={{ padding: '10px', height: '42px', background: 'hsl(var(--bg-app))', color: 'inherit' }}
+                  >
+                    <option value="highest">Highest Score Wins</option>
+                    <option value="lowest">Lowest Score Wins (e.g. Golf, Hearts)</option>
+                  </select>
+                </div>
+
+                <button
+                  className="btn-premium btn-primary-glow"
+                  style={{ padding: '12px', marginTop: '4px' }}
+                  onClick={() => {
+                    if (!customName.trim()) {
+                      alert("Please enter a game name.");
+                      return;
+                    }
+                    handleCreatePreset(customName, customMode, customTarget, customWinCond);
+                    // clear form
+                    setCustomName('');
+                  }}
+                >
+                  Create & Start Playing!
+                </button>
+              </div>
+
             </div>
           </div>
         </div>
