@@ -6,6 +6,12 @@ Talli is an elite, premium, offline-first Progressive Web App (PWA) designed to 
 
 ---
 
+## 🌐 Live Web Application
+
+🚀 **Play Talli in your browser now:** [https://zaphodnothingth.github.io/talli/](https://zaphodnothingth.github.io/talli/)
+
+---
+
 ## 🚀 Key Features
 
 - **🏆 Custom Rules & Presets Engine**: Seamlessly switch between predefined templates (Nertz, Hearts, Scrabble, Golf, Ping Pong, Classic) or define custom templates with target points, set rounds, and winning criteria (highest vs. lowest).
