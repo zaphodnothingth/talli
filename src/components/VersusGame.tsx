@@ -13,13 +13,15 @@ interface VersusGameProps {
   scores: Record<string, number>;
   onUpdateScore: (playerId: string, newScore: number) => void;
   onResetScores: () => void;
+  onMatchCompleted?: (winner: Player, p1Sets: number, p2Sets: number) => void;
 }
 
 export const VersusGame: React.FC<VersusGameProps> = ({
   activePlayers,
   scores,
   onUpdateScore,
-  onResetScores
+  onResetScores,
+  onMatchCompleted
 }) => {
   // Ensure we have exactly two players, if not fallback
   const p1 = activePlayers[0];
@@ -93,6 +95,9 @@ export const VersusGame: React.FC<VersusGameProps> = ({
       if (nextP1SetsWon >= setsToWin || nextP2SetsWon >= setsToWin) {
         sound.playWinFanfare();
         sound.speak(`Match over! ${playerNum === 1 ? p1.name : p2.name} won the match!`);
+        if (onMatchCompleted) {
+          onMatchCompleted(playerNum === 1 ? p1 : p2, nextP1SetsWon, nextP2SetsWon);
+        }
       } else {
         sound.speak(`Set completed! ${playerNum === 1 ? p1.name : p2.name} wins the set.`);
       }

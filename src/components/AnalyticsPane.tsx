@@ -1,6 +1,7 @@
 import React from 'react';
-import { TrendingUp, Shield, Flame } from 'lucide-react';
+import { TrendingUp, Shield, Flame, Calendar, Trash2, Trophy } from 'lucide-react';
 import type { Player } from './PlayerManager';
+import type { MatchSummary } from '../App';
 
 interface Round {
   id: number;
@@ -12,22 +13,31 @@ interface AnalyticsPaneProps {
   rounds: Round[];
   scores: Record<string, number>; // simple counter score fallback
   gameMode: 'tally' | 'round' | 'versus';
+  matchHistory?: MatchSummary[];
+  onClearHistory?: () => void;
 }
 
 export const AnalyticsPane: React.FC<AnalyticsPaneProps> = ({
   activePlayers,
   rounds,
   scores,
-  gameMode
+  gameMode,
+  matchHistory = [],
+  onClearHistory
 }) => {
 
-  const hasData = gameMode === 'round' ? rounds.length > 0 : activePlayers.length > 0;
+  const hasActiveData = gameMode === 'round' 
+    ? rounds.length > 0 
+    : (gameMode === 'tally' ? Object.keys(scores).length > 0 : false);
+
+  const hasData = hasActiveData || matchHistory.length > 0;
 
   if (!hasData) {
     return (
       <div className="glass-panel animate-fadein" style={{ padding: '40px 20px', textAlign: 'center', color: 'hsl(var(--text-muted))', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-        <h3>No Game Data Yet</h3>
-        <p style={{ marginTop: '8px' }}>Start scoring some rounds or points to generate live analytics charts!</p>
+        <div style={{ fontSize: '48px', marginBottom: '12px' }}>📊</div>
+        <h3>No Game Stats Yet</h3>
+        <p style={{ marginTop: '8px', fontSize: '13px' }}>Start scoring points, play rounds, or complete matches to showcase your hall of fame and dynamic charts here!</p>
       </div>
     );
   }
@@ -249,7 +259,11 @@ export const AnalyticsPane: React.FC<AnalyticsPaneProps> = ({
           Score Progression
         </h3>
         
-        {renderSVGChart()}
+        {hasActiveData ? renderSVGChart() : (
+          <div style={{ padding: '24px 12px', textAlign: 'center', color: 'hsl(var(--text-muted))', fontSize: '13px' }}>
+            No active game scoring yet. Add rounds in the game tab to populate real-time charts!
+          </div>
+        )}
       </div>
 
       {/* Insight Badges / Fun Stats */}
@@ -307,9 +321,121 @@ export const AnalyticsPane: React.FC<AnalyticsPaneProps> = ({
               </p>
             </div>
           </div>
-
         </div>
       )}
+
+      {/* MATCH HISTORY LOG */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '4px' }}>
+        <div className="flex-row-center" style={{ justifyContent: 'space-between' }}>
+          <h3 className="flex-row-center" style={{ fontSize: '13px', gap: '8px', color: 'hsl(var(--text-muted))', letterSpacing: '0.5px' }}>
+            <Calendar size={15} style={{ color: 'hsl(var(--accent-secondary))' }} />
+            <span>MATCH HISTORY ARCHIVE</span>
+          </h3>
+          {matchHistory.length > 0 && onClearHistory && (
+            <button
+              onClick={onClearHistory}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'hsl(var(--accent-danger))',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                fontSize: '11px',
+                fontWeight: 700,
+                padding: '4px 8px',
+                borderRadius: '6px',
+                transition: 'all 0.2s'
+              }}
+              title="Clear all match logs"
+            >
+              <Trash2 size={13} />
+              <span>Clear History</span>
+            </button>
+          )}
+        </div>
+
+        {matchHistory.length === 0 ? (
+          <div className="glass-card animate-fadein" style={{ padding: '30px 16px', textAlign: 'center', color: 'hsl(var(--text-muted))', fontSize: '13px' }}>
+            <div style={{ fontSize: '32px', marginBottom: '8px' }}>🗓️</div>
+            <h4 style={{ fontWeight: 600, color: 'hsl(var(--text-secondary))' }}>No Archived Matches</h4>
+            <p style={{ marginTop: '4px', lineHeight: 1.4 }}>Complete any match with a target score set to automatically archive results in this hall of fame.</p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {matchHistory.map((match) => (
+              <div 
+                key={match.id} 
+                className="glass-card animate-scalein" 
+                style={{ 
+                  padding: '16px', 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  gap: '12px',
+                  borderLeft: `3px solid ${match.winnerId ? `hsl(var(${match.players.find(p => p.name === match.winnerName)?.colorVar || '--accent-primary'}))` : 'hsl(var(--accent-primary))'}`
+                }}
+              >
+                {/* Header: Preset and Date */}
+                <div className="flex-row-center" style={{ justifyContent: 'space-between', fontSize: '12px' }}>
+                  <span style={{ fontWeight: 800, color: 'hsl(var(--text-primary))', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    {match.presetName}
+                  </span>
+                  <span style={{ color: 'hsl(var(--text-muted))' }}>
+                    {match.date}
+                  </span>
+                </div>
+
+                {/* Winner announcement */}
+                <div className="flex-row-center" style={{ gap: '6px', fontSize: '13px' }}>
+                  <Trophy size={14} style={{ color: 'hsl(var(--accent-warning))' }} />
+                  <span>
+                    Winner:{' '}
+                    <strong style={{ color: `hsl(var(${match.players.find(p => p.name === match.winnerName)?.colorVar || '--text-primary'}))` }}>
+                      {match.winnerName}
+                    </strong>
+                  </span>
+                </div>
+
+                {/* Scoreboard grid for this match */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px' }}>
+                  {match.players.map((player, pIdx) => {
+                    const isWinner = player.name === match.winnerName;
+                    return (
+                      <div 
+                        key={pIdx} 
+                        style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '6px', 
+                          background: 'hsl(var(--bg-app) / 0.5)', 
+                          padding: '4px 10px', 
+                          borderRadius: '20px',
+                          fontSize: '12px',
+                          border: isWinner ? '1px solid hsl(var(--accent-warning) / 0.3)' : '1px solid transparent'
+                        }}
+                      >
+                        <div 
+                          style={{ 
+                            width: '8px', 
+                            height: '8px', 
+                            borderRadius: '50%', 
+                            background: `hsl(var(${player.colorVar}))`,
+                            boxShadow: `0 0 6px hsl(var(${player.colorVar}) / 0.5)`
+                          }} 
+                        />
+                        <span style={{ color: 'hsl(var(--text-secondary))' }}>{player.name}</span>
+                        <strong style={{ fontFamily: 'var(--font-mono)' }}>{player.score}</strong>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
     </div>
   );
 };

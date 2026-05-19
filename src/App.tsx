@@ -38,6 +38,16 @@ export interface GamePreset {
   allowNegative?: boolean;
 }
 
+export interface MatchSummary {
+  id: string;
+  date: string;
+  presetName: string;
+  targetScore: number;
+  winnerId: string;
+  winnerName: string;
+  players: Array<{ name: string; score: number; colorVar: string }>;
+}
+
 const DEFAULT_PRESETS: GamePreset[] = [
   { id: 'tally', name: 'Classic Tally', mode: 'counters', targetScore: 0, winCondition: 'highest' },
   { id: 'nertz', name: 'Nertz', mode: 'rounds', targetScore: 100, winCondition: 'highest' },
@@ -74,6 +84,9 @@ function App() {
   // Undo/Redo State stack
   const [undoStack, setUndoStack] = useState<GameStateSnapshot[]>([]);
 
+  // Match History Logs
+  const [matchHistory, setMatchHistory] = useState<MatchSummary[]>([]);
+
   // Preferences State
   const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
   const [isSoundOn, setIsSoundOn] = useState<boolean>(true);
@@ -83,6 +96,14 @@ function App() {
   // PWA Install State
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallBtn, setShowInstallBtn] = useState<boolean>(false);
+
+  const handleClearHistory = () => {
+    if (confirm("Are you sure you want to clear your entire match history? This will delete all past match logs permanently, but won't change your current players' lifetime statistics.")) {
+      setMatchHistory([]);
+      localStorage.removeItem('talli_match_history');
+      sound.playUndo();
+    }
+  };
 
   // Initialize data from LocalStorage
   useEffect(() => {
@@ -145,6 +166,16 @@ function App() {
     // Audio states init
     setIsSoundOn(sound.getSoundEnabled());
     setIsSpeechOn(sound.getSpeechEnabled());
+
+    // Match history logs init
+    const savedHistory = localStorage.getItem('talli_match_history');
+    if (savedHistory) {
+      try {
+        setMatchHistory(JSON.parse(savedHistory));
+      } catch (e) {
+        console.error(e);
+      }
+    }
 
     // Listen for PWA installer prompt
     window.addEventListener('beforeinstallprompt', (e) => {
@@ -391,8 +422,76 @@ function App() {
         });
 
         savePlayersToStorage(updatedPlayers);
+
+        // Compile match history record
+        const newMatch: MatchSummary = {
+          id: `match_${Date.now()}`,
+          date: new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+          presetName: activePreset.name,
+          targetScore: targetScore,
+          winnerId: absoluteWinner.id,
+          winnerName: absoluteWinner.name,
+          players: activePlayers.map(p => ({
+            name: p.name,
+            score: totals[p.id] || 0,
+            colorVar: p.colorVar
+          }))
+        };
+        setMatchHistory(prev => {
+          const nextHistory = [newMatch, ...prev];
+          localStorage.setItem('talli_match_history', JSON.stringify(nextHistory));
+          return nextHistory;
+        });
       }
     }
+  };
+
+  const handleVersusMatchCompleted = (winnerPlayer: Player, p1Sets: number, p2Sets: number) => {
+    const p1 = activePlayers[0];
+    const p2 = activePlayers[1];
+    if (!p1 || !p2) return;
+
+    const newMatch: MatchSummary = {
+      id: `match_${Date.now()}`,
+      date: new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+      presetName: activePreset.name,
+      targetScore: activePreset.targetScore || 0,
+      winnerId: winnerPlayer.id,
+      winnerName: winnerPlayer.name,
+      players: [
+        { name: p1.name, score: p1Sets, colorVar: p1.colorVar },
+        { name: p2.name, score: p2Sets, colorVar: p2.colorVar }
+      ]
+    };
+
+    setMatchHistory(prev => {
+      const nextHistory = [newMatch, ...prev];
+      localStorage.setItem('talli_match_history', JSON.stringify(nextHistory));
+      return nextHistory;
+    });
+
+    // Save stats to historical records for players
+    const updatedPlayers = players.map(p => {
+      const isActive = activePlayerIds.includes(p.id);
+      if (!isActive) return p;
+
+      const isWinner = p.id === winnerPlayer.id;
+      const gameScore = p.id === p1.id ? p1Sets : p2Sets;
+      const nextPlayed = p.gamesPlayed + 1;
+      const nextWon = p.gamesWon + (isWinner ? 1 : 0);
+      const nextMax = Math.max(p.maxScore, gameScore);
+      const nextAvg = (p.avgScore * p.gamesPlayed + gameScore) / nextPlayed;
+
+      return {
+        ...p,
+        gamesPlayed: nextPlayed,
+        gamesWon: nextWon,
+        maxScore: nextMax,
+        avgScore: nextAvg
+      };
+    });
+
+    savePlayersToStorage(updatedPlayers);
   };
 
   const handleDeleteLastRound = () => {
@@ -622,6 +721,7 @@ function App() {
             scores={scores}
             onUpdateScore={handleUpdateScore}
             onResetScores={handleResetScores}
+            onMatchCompleted={handleVersusMatchCompleted}
           />
         )}
 
@@ -640,7 +740,9 @@ function App() {
             activePlayers={activePlayers}
             rounds={rounds}
             scores={scores}
-            gameMode={rounds.length > 0 ? 'round' : 'tally'}
+            gameMode={rounds.length > 0 ? 'round' : (activePreset.mode === 'versus' ? 'versus' : 'tally')}
+            matchHistory={matchHistory}
+            onClearHistory={handleClearHistory}
           />
         )}
 
