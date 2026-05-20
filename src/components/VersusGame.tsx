@@ -23,9 +23,17 @@ export const VersusGame: React.FC<VersusGameProps> = ({
   onResetScores,
   onMatchCompleted
 }) => {
+  const [p1Id, setP1Id] = useState<string | null>(null);
+  const [p2Id, setP2Id] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!p1Id && activePlayers.length >= 1) setP1Id(activePlayers[0].id);
+    if (!p2Id && activePlayers.length >= 2) setP2Id(activePlayers[1].id);
+  }, [activePlayers, p1Id, p2Id]);
+
   // Ensure we have exactly two players, if not fallback
-  const p1 = activePlayers[0];
-  const p2 = activePlayers[1];
+  const p1 = activePlayers.find(p => p.id === p1Id) || activePlayers[0];
+  const p2 = activePlayers.find(p => p.id === p2Id) || activePlayers[1];
 
   const s1 = p1 ? (scores[p1.id] || 0) : 0;
   const s2 = p2 ? (scores[p2.id] || 0) : 0;
@@ -35,6 +43,7 @@ export const VersusGame: React.FC<VersusGameProps> = ({
   const [setsToWin, setSetsToWin] = useState<number>(2); // Best of 3 (needs 2 sets to win)
   const [pointsToWin, setPointsToWin] = useState<number>(11); // Standard ping pong is 11
   const [serveInterval, setServeInterval] = useState<number>(2); // Swaps server every 2 points
+  const [deuceAdvantage, setDeuceAdvantage] = useState<boolean>(true); // Win by 2 points
   const [server, setServer] = useState<1 | 2>(1); // Active server: 1 or 2
 
   if (!p1 || !p2) {
@@ -56,8 +65,8 @@ export const VersusGame: React.FC<VersusGameProps> = ({
   // Automatic serve calculation
   const totalPoints = s1 + s2;
   const activeServer = (() => {
-    // In deuce (both >= pointsToWin - 1), serve rotates every single point
-    const isDeuce = s1 >= pointsToWin - 1 && s2 >= pointsToWin - 1;
+    // In deuce (both >= pointsToWin - 1), serve rotates every single point if deuce advantage is ON
+    const isDeuce = deuceAdvantage && s1 >= pointsToWin - 1 && s2 >= pointsToWin - 1;
     const interval = isDeuce ? 1 : serveInterval;
     const rotations = Math.floor(totalPoints / interval);
     
@@ -76,8 +85,13 @@ export const VersusGame: React.FC<VersusGameProps> = ({
     // Check set win condition
     const opponentScore = playerNum === 1 ? s2 : s1;
     
-    // Standard Win: reached target score AND leading by at least 2 points
-    if (nextScore >= pointsToWin && (nextScore - opponentScore) >= 2) {
+    // Win Condition
+    const margin = nextScore - opponentScore;
+    const isWin = deuceAdvantage 
+      ? (nextScore >= pointsToWin && margin >= 2)
+      : (nextScore >= pointsToWin);
+
+    if (isWin) {
       sound.playMatchPoint();
       
       const newSet: SetHistory = {
@@ -145,7 +159,33 @@ export const VersusGame: React.FC<VersusGameProps> = ({
       
       {/* Versus Custom Configurations */}
       {!isMatchOver && sets.length === 0 && s1 === 0 && s2 === 0 && (
-        <div className="glass-panel" style={{ padding: '12px 16px', display: 'flex', flexWrap: 'wrap', gap: '12px', justifyContent: 'space-between', fontSize: '12px' }}>
+        <div className="glass-panel" style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '16px', fontSize: '12px' }}>
+          
+          {/* Player Selectors */}
+          <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+              <span style={{ color: 'hsl(var(--text-muted))', fontWeight: 600, marginBottom: '4px' }}>PLAYER 1</span>
+              <select 
+                value={p1?.id || ''} 
+                onChange={(e) => setP1Id(e.target.value)}
+                style={{ width: '100%', background: 'hsl(var(--bg-app))', color: 'hsl(var(--text-primary))', border: '1px solid hsl(var(--border-light))', borderRadius: '6px', padding: '6px', fontWeight: 700, outline: 'none' }}
+              >
+                {activePlayers.map(p => <option key={`p1-${p.id}`} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+              <span style={{ color: 'hsl(var(--text-muted))', fontWeight: 600, marginBottom: '4px' }}>PLAYER 2</span>
+              <select 
+                value={p2?.id || ''} 
+                onChange={(e) => setP2Id(e.target.value)}
+                style={{ width: '100%', background: 'hsl(var(--bg-app))', color: 'hsl(var(--text-primary))', border: '1px solid hsl(var(--border-light))', borderRadius: '6px', padding: '6px', fontWeight: 700, outline: 'none' }}
+              >
+                {activePlayers.map(p => <option key={`p2-${p.id}`} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', justifyContent: 'space-between' }}>
           <div>
             <span style={{ color: 'hsl(var(--text-muted))' }}>PLAY TO: </span>
             <select 
@@ -183,6 +223,19 @@ export const VersusGame: React.FC<VersusGameProps> = ({
               <option value="5">5 Sets</option>
               <option value="1">1 Set</option>
             </select>
+          </div>
+
+          <div>
+            <span style={{ color: 'hsl(var(--text-muted))' }}>WIN BY 2: </span>
+            <select 
+              value={deuceAdvantage ? "yes" : "no"} 
+              onChange={(e) => setDeuceAdvantage(e.target.value === "yes")}
+              style={{ background: 'transparent', color: 'inherit', border: 'none', borderBottom: '1px solid hsl(var(--border-light))', fontWeight: 700, outline: 'none' }}
+            >
+              <option value="yes">Enabled</option>
+              <option value="no">Disabled</option>
+            </select>
+          </div>
           </div>
         </div>
       )}
@@ -399,7 +452,7 @@ export const VersusGame: React.FC<VersusGameProps> = ({
           {/* Quick HUD resets */}
           <div className="glass-panel flex-row-center" style={{ padding: '8px 16px' }}>
             <span style={{ fontSize: '11px', color: 'hsl(var(--text-secondary))' }}>
-              PLAYING TO {pointsToWin} PTS. DEUCE ADVANTAGE ENABLED.
+              PLAYING TO {pointsToWin} PTS. {deuceAdvantage ? 'DEUCE ADVANTAGE ENABLED.' : 'NO WIN-BY-2 REQUIRED.'}
             </span>
             
             <button

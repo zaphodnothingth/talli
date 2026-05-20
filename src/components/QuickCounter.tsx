@@ -31,7 +31,8 @@ export const QuickCounter: React.FC<QuickCounterProps> = ({
     onAdjustScore(playerId, step);
   };
 
-  const handleDecrement = (playerId: string) => {
+  const handleDecrement = (playerId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     sound.playTickDown();
     
     setAnimatingId(playerId);
@@ -158,8 +159,10 @@ export const QuickCounter: React.FC<QuickCounterProps> = ({
                   justifyContent: 'space-between',
                   padding: '14px 18px',
                   borderColor: `hsl(var(${player.colorVar}) / 0.3)`,
-                  background: `linear-gradient(90deg, hsl(var(${player.colorVar}) / 0.04) 0%, hsl(var(--bg-card)) 100%)`
+                  background: `linear-gradient(90deg, hsl(var(${player.colorVar}) / 0.04) 0%, hsl(var(--bg-card)) 100%)`,
+                  cursor: 'pointer'
                 }}
+                onClick={() => handleIncrement(player.id)}
               >
                 {/* Player details */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -180,7 +183,7 @@ export const QuickCounter: React.FC<QuickCounterProps> = ({
                   <button
                     className="btn-icon-circle"
                     style={{ width: '38px', height: '38px' }}
-                    onClick={() => handleDecrement(player.id)}
+                    onClick={(e) => handleDecrement(player.id, e)}
                   >
                     <Minus size={16} />
                   </button>
@@ -210,7 +213,7 @@ export const QuickCounter: React.FC<QuickCounterProps> = ({
                       color: '#fff',
                       boxShadow: `0 4px 10px hsl(var(${player.colorVar}) / 0.2)`
                     }}
-                    onClick={() => handleIncrement(player.id)}
+                    onClick={(e) => { e.stopPropagation(); handleIncrement(player.id); }}
                   >
                     <Plus size={16} />
                   </button>
