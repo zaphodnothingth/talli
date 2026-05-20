@@ -95,11 +95,25 @@ body {
   border: 1px solid hsl(var(--border-light));
 }
 
-@media (min-width: 481px) {
+@media (min-width: 600px) {
   #root {
+    max-width: 1200px;
     height: 90vh;
     height: 90svh;
     border-radius: var(--radius-lg);
+  }
+}
+
+/* Fluid Grids for Tablet/Desktop */
+.player-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 600px) {
+  .player-grid {
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   }
 }
 

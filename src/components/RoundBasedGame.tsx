@@ -10,6 +10,7 @@ interface Round {
 
 interface RoundBasedGameProps {
   activePlayers: Player[];
+  totalScores: Record<string, number>;
   rounds: Round[];
   targetScore: number;
   isGameOver: boolean;
@@ -22,6 +23,7 @@ interface RoundBasedGameProps {
 
 export const RoundBasedGame: React.FC<RoundBasedGameProps> = ({
   activePlayers,
+  totalScores,
   rounds,
   targetScore,
   isGameOver,
@@ -35,23 +37,7 @@ export const RoundBasedGame: React.FC<RoundBasedGameProps> = ({
   const [roundInputs, setRoundInputs] = useState<Record<string, string>>({});
   const [dealerIndex, setDealerIndex] = useState(0);
 
-  // Helper to get total scores
-  const getTotals = () => {
-    const totals: Record<string, number> = {};
-    activePlayers.forEach(p => {
-      totals[p.id] = 0;
-    });
-    
-    rounds.forEach(r => {
-      activePlayers.forEach(p => {
-        totals[p.id] += r.scores[p.id] || 0;
-      });
-    });
-
-    return totals;
-  };
-
-  const totals = getTotals();
+  // Use unified totalScores prop
 
   // Initialize round input fields
   const handleOpenInput = () => {
@@ -93,7 +79,7 @@ export const RoundBasedGame: React.FC<RoundBasedGameProps> = ({
 
   // Find who has the lowest/highest scores
   const getSortedStandings = () => {
-    return [...activePlayers].sort((a, b) => (totals[a.id] || 0) - (totals[b.id] || 0));
+    return [...activePlayers].sort((a, b) => (totalScores[a.id] || 0) - (totalScores[b.id] || 0));
   };
 
   const standings = getSortedStandings();
@@ -217,7 +203,7 @@ export const RoundBasedGame: React.FC<RoundBasedGameProps> = ({
                   #{index + 1} {p.name}
                 </span>
                 <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
-                  {totals[p.id]} pts
+                  {totalScores[p.id]} pts
                 </span>
               </div>
             ))}
@@ -240,9 +226,9 @@ export const RoundBasedGame: React.FC<RoundBasedGameProps> = ({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1 }}>
           
           {/* Quick stand list */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div className="player-grid">
             {activePlayers.map((player) => {
-              const score = totals[player.id] || 0;
+              const score = totalScores[player.id] || 0;
               const percentOfTarget = Math.min(100, Math.max(0, (score / targetScore) * 100));
               const isWarning = score >= targetScore * 0.8;
 

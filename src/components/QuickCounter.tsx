@@ -5,41 +5,39 @@ import { sound } from '../utils/SoundManager';
 
 interface QuickCounterProps {
   activePlayers: Player[];
-  scores: Record<string, number>;
-  onUpdateScore: (playerId: string, newScore: number) => void;
+  totalScores: Record<string, number>;
+  onAdjustScore: (playerId: string, delta: number) => void;
   onResetScores: () => void;
+  onMatchCompleted: () => void;
 }
 
 export const QuickCounter: React.FC<QuickCounterProps> = ({
   activePlayers,
-  scores,
-  onUpdateScore,
-  onResetScores
+  totalScores,
+  onAdjustScore,
+  onResetScores,
+  onMatchCompleted
 }) => {
   const [step, setStep] = useState<number>(1);
   const [animatingId, setAnimatingId] = useState<string | null>(null);
 
   const handleIncrement = (playerId: string) => {
     sound.playDing();
-    const currentScore = scores[playerId] || 0;
-    const newScore = currentScore + step;
     
     // Trigger pop animation
     setAnimatingId(playerId);
     setTimeout(() => setAnimatingId(null), 300);
 
-    onUpdateScore(playerId, newScore);
+    onAdjustScore(playerId, step);
   };
 
   const handleDecrement = (playerId: string) => {
     sound.playTickDown();
-    const currentScore = scores[playerId] || 0;
-    const newScore = currentScore - step;
     
     setAnimatingId(playerId);
     setTimeout(() => setAnimatingId(null), 300);
 
-    onUpdateScore(playerId, newScore);
+    onAdjustScore(playerId, -step);
   };
 
   const handleSpeakLeader = () => {
@@ -47,11 +45,11 @@ export const QuickCounter: React.FC<QuickCounterProps> = ({
     
     // Find player with highest score
     let leader = activePlayers[0];
-    let max = scores[leader.id] || 0;
+    let max = totalScores[leader.id] || 0;
     let isTie = false;
 
     for (let i = 1; i < activePlayers.length; i++) {
-      const s = scores[activePlayers[i].id] || 0;
+      const s = totalScores[activePlayers[i].id] || 0;
       if (s > max) {
         max = s;
         leader = activePlayers[i];
@@ -112,6 +110,19 @@ export const QuickCounter: React.FC<QuickCounterProps> = ({
           
           <button
             className="btn-premium"
+            style={{ padding: '8px 12px', fontSize: '11px', color: 'hsl(var(--accent-success))' }}
+            onClick={() => {
+              if (window.confirm("Finish match and save to history?")) {
+                onMatchCompleted();
+              }
+            }}
+            title="End Match"
+          >
+            End Match
+          </button>
+          
+          <button
+            className="btn-premium"
             style={{ padding: '8px', color: 'hsl(var(--text-muted))' }}
             onClick={() => {
               sound.playUndo();
@@ -132,17 +143,9 @@ export const QuickCounter: React.FC<QuickCounterProps> = ({
           <p style={{ marginTop: '8px' }}>Go to the Players tab to create and activate players for this match!</p>
         </div>
       ) : (
-        <div 
-          style={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
-            gap: '12px', 
-            flex: 1, 
-            overflowY: 'auto' 
-          }}
-        >
+        <div className="player-grid" style={{ flex: 1, overflowY: 'auto' }}>
           {activePlayers.map((player) => {
-            const score = scores[player.id] || 0;
+            const score = totalScores[player.id] || 0;
             const isAnimating = animatingId === player.id;
 
             return (

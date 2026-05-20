@@ -254,11 +254,11 @@ function App() {
   };
 
   // Score management actions
-  const handleUpdateScore = (playerId: string, newScore: number) => {
+  const handleAdjustScore = (playerId: string, delta: number) => {
     pushToUndoStack(scores, rounds);
     setScores(prev => ({
       ...prev,
-      [playerId]: newScore
+      [playerId]: (prev[playerId] || 0) + delta
     }));
   };
 
@@ -551,29 +551,29 @@ function App() {
   const activePlayers = players.filter(p => activePlayerIds.includes(p.id));
 
   // Determine game over state
-  const getTotals = () => {
-    const totals: Record<string, number> = {};
-    activePlayers.forEach(p => { totals[p.id] = 0; });
+  const aggregateScores = () => {
+    const agg: Record<string, number> = {};
+    activePlayers.forEach(p => { agg[p.id] = scores[p.id] || 0; });
     rounds.forEach(r => {
       activePlayers.forEach(p => {
-        totals[p.id] += r.scores[p.id] || 0;
+        agg[p.id] += r.scores[p.id] || 0;
       });
     });
-    return totals;
+    return agg;
   };
-  const totals = getTotals();
+  const totalScores = aggregateScores();
   const exceededCount = targetScore > 0 
-    ? activePlayers.filter(p => (totals[p.id] || 0) >= targetScore).length
+    ? activePlayers.filter(p => (totalScores[p.id] || 0) >= targetScore).length
     : 0;
   const isGameOver = rounds.length > 0 && targetScore > 0 && exceededCount > 0;
   
   const getWinner = () => {
     if (!isGameOver) return null;
     let winner = activePlayers[0];
-    let winningScore = totals[winner.id] || 0;
+    let winningScore = totalScores[winner.id] || 0;
     
     activePlayers.forEach(p => {
-      const score = totals[p.id] || 0;
+      const score = totalScores[p.id] || 0;
       if (activePreset.winCondition === 'highest') {
         if (score > winningScore) {
           winningScore = score;
@@ -589,6 +589,94 @@ function App() {
     return winner;
   };
   const winner = getWinner();
+
+  // Tally Tab Match Completed Handler
+  const handleTallyMatchCompleted = () => {
+    if (activePlayers.length === 0) return;
+    
+    // Find absolute winner based on totalScores
+    let absoluteWinner = activePlayers[0];
+    let winningVal = totalScores[absoluteWinner.id] || 0;
+
+    activePlayers.forEach(p => {
+      const val = totalScores[p.id] || 0;
+      if (activePreset.winCondition === 'highest') {
+        if (val > winningVal) {
+          winningVal = val;
+          absoluteWinner = p;
+        }
+      } else {
+        if (val < winningVal) {
+          winningVal = val;
+          absoluteWinner = p;
+        }
+      }
+    });
+
+    // Celebrate!
+    setTimeout(() => {
+      confetti({
+        particleCount: 150,
+        spread: 80,
+        origin: { y: 0.65 }
+      });
+      sound.playWinFanfare();
+      if (isSpeechOn) {
+        sound.speak(`${absoluteWinner.name} wins the match with ${winningVal} points!`);
+      }
+    }, 300);
+
+    // Save stats to historical records
+    const updatedPlayers = players.map(p => {
+      const isActive = activePlayerIds.includes(p.id);
+      if (!isActive) return p;
+
+      const isWinner = p.id === absoluteWinner.id;
+      const gameScore = totalScores[p.id] || 0;
+      const nextPlayed = p.gamesPlayed + 1;
+      const nextWon = p.gamesWon + (isWinner ? 1 : 0);
+      const nextMax = Math.max(p.maxScore, gameScore);
+      const nextAvg = (p.avgScore * p.gamesPlayed + gameScore) / nextPlayed;
+
+      return {
+        ...p,
+        gamesPlayed: nextPlayed,
+        gamesWon: nextWon,
+        maxScore: nextMax,
+        avgScore: nextAvg
+      };
+    });
+
+    savePlayersToStorage(updatedPlayers);
+
+    // Compile match history record
+    const newMatch: MatchSummary = {
+      id: `match_${Date.now()}`,
+      date: new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+      presetName: activePreset.name,
+      targetScore: targetScore,
+      winnerId: absoluteWinner.id,
+      winnerName: absoluteWinner.name,
+      players: activePlayers.map(p => ({
+        name: p.name,
+        score: totalScores[p.id] || 0,
+        colorVar: p.colorVar
+      }))
+    };
+    setMatchHistory(prev => {
+      const nextHistory = [newMatch, ...prev];
+      localStorage.setItem('talli_match_history', JSON.stringify(nextHistory));
+      return nextHistory;
+    });
+
+    // Reset scores & rounds for next game
+    setRounds([]);
+    const reset: Record<string, number> = {};
+    activePlayerIds.forEach(id => {
+      reset[id] = 0;
+    });
+    setScores(reset);
+  };
 
   return (
     <div className="app-container">
@@ -695,15 +783,17 @@ function App() {
         {activeTab === 'counters' && (
           <QuickCounter
             activePlayers={activePlayers}
-            scores={scores}
-            onUpdateScore={handleUpdateScore}
+            totalScores={totalScores}
+            onAdjustScore={handleAdjustScore}
             onResetScores={handleResetScores}
+            onMatchCompleted={handleTallyMatchCompleted}
           />
         )}
 
         {activeTab === 'rounds' && (
           <RoundBasedGame
             activePlayers={activePlayers}
+            totalScores={totalScores}
             rounds={rounds}
             targetScore={targetScore}
             isGameOver={isGameOver}
@@ -718,8 +808,12 @@ function App() {
         {activeTab === 'versus' && (
           <VersusGame
             activePlayers={activePlayers}
-            scores={scores}
-            onUpdateScore={handleUpdateScore}
+            scores={totalScores}
+            onUpdateScore={(playerId, newScore) => {
+               // For Versus, which replaces scores directly, we calculate delta from total
+               const delta = newScore - (totalScores[playerId] || 0);
+               handleAdjustScore(playerId, delta);
+            }}
             onResetScores={handleResetScores}
             onMatchCompleted={handleVersusMatchCompleted}
           />
@@ -739,7 +833,7 @@ function App() {
           <AnalyticsPane
             activePlayers={activePlayers}
             rounds={rounds}
-            scores={scores}
+            scores={totalScores}
             gameMode={rounds.length > 0 ? 'round' : (activePreset.mode === 'versus' ? 'versus' : 'tally')}
             matchHistory={matchHistory}
             onClearHistory={handleClearHistory}
