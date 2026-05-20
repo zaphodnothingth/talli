@@ -2,8 +2,8 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="./talli_app_icon_1779224598013.png" />
-    <link rel="apple-touch-icon" href="./talli_app_icon_1779224598013.png" />
+    <link rel="icon" type="image/png" href="talli_app_icon_1779224598013.png" />
+    <link rel="apple-touch-icon" href="talli_app_icon_1779224598013.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#0B0F19" />
     
@@ -13,7 +13,7 @@
     <meta name="apple-mobile-web-app-title" content="Talli" />
     <meta name="mobile-web-app-capable" content="yes" />
     
-    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="manifest" href="manifest.webmanifest" />
     
     <title>Talli | The Ultimate Scorekeeper</title>
     
@@ -30,7 +30,7 @@
       // Service worker registration for 100% offline capability
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
+          navigator.serviceWorker.register('sw.js')
             .then(reg => console.log('Talli ServiceWorker registered successfully.', reg.scope))
             .catch(err => console.log('Talli ServiceWorker registration failed:', err));
         });
