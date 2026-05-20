@@ -2,14 +2,14 @@
   "name": "Talli | The Ultimate Scorekeeper",
   "short_name": "Talli",
   "description": "An ultra-premium, beautiful score keeping application with custom analytics, offline support, and audio integration.",
-  "start_url": "/",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#0B0F19",
   "theme_color": "#0B0F19",
   "orientation": "any",
   "icons": [
     {
-      "src": "/talli_app_icon_1779224598013.png",
+      "src": "talli_app_icon_1779224598013.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

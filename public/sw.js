@@ -1,10 +1,10 @@
 const CACHE_NAME = 'talli-cache-v1';
 const ASSETS_TO_CACHE = [
-  '/',
-  '/index.html',
-  '/manifest.webmanifest',
-  '/talli_app_icon_1779224598013.png',
-  '/talli_feature_graphic_1779224611511.png'
+  './',
+  './index.html',
+  './manifest.webmanifest',
+  './talli_app_icon_1779224598013.png',
+  './talli_feature_graphic_1779224611511.png'
 ];
 
 // Install Event
@@ -73,7 +73,7 @@ self.addEventListener('fetch', (event) => {
         .catch(() => {
           // If offline and request is for page, return cached index
           if (event.request.mode === 'navigate') {
-            return caches.match('/index.html');
+            return caches.match('./index.html');
           }
         });
     })
