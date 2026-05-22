@@ -560,6 +560,12 @@ export const AnalyticsPane: React.FC<AnalyticsPaneProps> = ({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {(isHistoryExpanded ? matchHistory : matchHistory.slice(0, 5)).map((match) => {
                 const isSelected = selectedMatchIds.includes(match.id);
+                
+                // Parse tie-safe winner values
+                const winnerNames = match.winnerName ? match.winnerName.replace(' (Tie)', '').split(' & ') : [];
+                const matchingPlayer = match.players.find(p => winnerNames.includes(p.name));
+                const winnerColorVar = matchingPlayer?.colorVar || '--accent-primary';
+
                 const cardMarkup = (
                   <div 
                     className={`glass-card animate-scalein ${isSelected ? 'selected' : ''}`} 
@@ -576,10 +582,10 @@ export const AnalyticsPane: React.FC<AnalyticsPaneProps> = ({
                       gap: '12px',
                       width: '100%',
                       cursor: isEditMode ? 'pointer' : 'default',
-                      borderLeft: `3px solid ${match.winnerId ? `hsl(var(${match.players.find(p => p.name === match.winnerName)?.colorVar || '--accent-primary'}))` : 'hsl(var(--accent-primary))'}`,
+                      borderLeft: `3px solid hsl(var(${winnerColorVar}))`,
                       background: isSelected 
                         ? 'linear-gradient(90deg, hsl(var(--accent-primary) / 0.08) 0%, hsl(var(--bg-card) / 0.9) 100%)' 
-                        : `linear-gradient(90deg, hsl(var(${match.players.find(p => p.name === match.winnerName)?.colorVar || '--accent-primary'} / 0.04) 0%, hsl(var(--bg-card)) 100%)`
+                        : `linear-gradient(90deg, hsl(var(${winnerColorVar} / 0.04)) 0%, hsl(var(--bg-card)) 100%)`
                     }}
                   >
                     {/* Edit mode selection checkmark */}
@@ -606,7 +612,7 @@ export const AnalyticsPane: React.FC<AnalyticsPaneProps> = ({
                         <Trophy size={14} style={{ color: 'hsl(var(--accent-warning))' }} />
                         <span>
                           Winner:{' '}
-                          <strong style={{ color: `hsl(var(${match.players.find(p => p.name === match.winnerName)?.colorVar || '--text-primary'}))` }}>
+                          <strong style={{ color: `hsl(var(${winnerColorVar}))` }}>
                             {match.winnerName}
                           </strong>
                         </span>
@@ -615,7 +621,7 @@ export const AnalyticsPane: React.FC<AnalyticsPaneProps> = ({
                       {/* Scoreboard grid for this match */}
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px' }}>
                         {match.players.map((player, pIdx) => {
-                          const isWinner = player.name === match.winnerName;
+                          const isWinner = winnerNames.includes(player.name);
                           return (
                             <div 
                               key={pIdx} 

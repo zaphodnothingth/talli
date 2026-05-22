@@ -385,24 +385,13 @@ function App() {
       const exceededPlayers = activePlayers.filter(p => (totals[p.id] || 0) >= targetScore);
       
       if (exceededPlayers.length > 0) {
-        // Find absolute winner (lowest or highest based on preset!)
-        let absoluteWinner = activePlayers[0];
-        let winningVal = totals[absoluteWinner.id] || 0;
-
-        activePlayers.forEach(p => {
-          const val = totals[p.id] || 0;
-          if (activePreset.winCondition === 'highest') {
-            if (val > winningVal) {
-              winningVal = val;
-              absoluteWinner = p;
-            }
-          } else {
-            if (val < winningVal) {
-              winningVal = val;
-              absoluteWinner = p;
-            }
-          }
-        });
+        // Find absolute winner(s) (lowest or highest based on preset!)
+        const scoresList = activePlayers.map(p => totals[p.id] || 0);
+        const winningVal = activePreset.winCondition === 'highest'
+          ? Math.max(...scoresList)
+          : Math.min(...scoresList);
+          
+        const absoluteWinners = activePlayers.filter(p => (totals[p.id] || 0) === winningVal);
 
         // Celebrate!
         setTimeout(() => {
@@ -414,7 +403,12 @@ function App() {
           sound.playWinFanfare();
           
           if (isSpeechOn) {
-            sound.speak(`${absoluteWinner.name} wins the game of ${activePreset.name} with ${winningVal} points!`);
+            const namesStr = absoluteWinners.map(w => w.name).join(' and ');
+            if (absoluteWinners.length > 1) {
+              sound.speak(`It's a tie! ${namesStr} win the game of ${activePreset.name} with ${winningVal} points!`);
+            } else {
+              sound.speak(`${absoluteWinners[0].name} wins the game of ${activePreset.name} with ${winningVal} points!`);
+            }
           }
         }, 300);
 
@@ -423,7 +417,7 @@ function App() {
           const isActive = activePlayerIds.includes(p.id);
           if (!isActive) return p;
 
-          const isWinner = p.id === absoluteWinner.id;
+          const isWinner = absoluteWinners.some(w => w.id === p.id);
           const gameScore = totals[p.id] || 0;
           const nextPlayed = p.gamesPlayed + 1;
           const nextWon = p.gamesWon + (isWinner ? 1 : 0);
@@ -441,14 +435,14 @@ function App() {
 
         savePlayersToStorage(updatedPlayers);
 
-        // Compile match history record
+        // Compile match history record (with tie-safe winnerName/Id)
         const newMatch: MatchSummary = {
           id: `match_${Date.now()}`,
           date: new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
           presetName: activePreset.name,
           targetScore: targetScore,
-          winnerId: absoluteWinner.id,
-          winnerName: absoluteWinner.name,
+          winnerId: absoluteWinners.map(w => w.id).join(','),
+          winnerName: absoluteWinners.map(w => w.name).join(' & ') + (absoluteWinners.length > 1 ? ' (Tie)' : ''),
           players: activePlayers.map(p => ({
             name: p.name,
             score: totals[p.id] || 0,
@@ -613,51 +607,38 @@ function App() {
     : 0;
   const isGameOver = rounds.length > 0 && targetScore > 0 && exceededCount > 0;
   
-  const getWinner = () => {
-    if (!isGameOver) return null;
-    let winner = activePlayers[0];
-    let winningScore = totalScores[winner.id] || 0;
+  const getWinners = (): Player[] => {
+    if (!isGameOver) return [];
+    if (activePlayers.length === 0) return [];
     
-    activePlayers.forEach(p => {
-      const score = totalScores[p.id] || 0;
-      if (activePreset.winCondition === 'highest') {
-        if (score > winningScore) {
-          winningScore = score;
-          winner = p;
-        }
-      } else {
-        if (score < winningScore) {
-          winningScore = score;
-          winner = p;
-        }
-      }
-    });
-    return winner;
+    const scoresList = activePlayers.map(p => totalScores[p.id] || 0);
+    const winningScore = activePreset.winCondition === 'highest'
+      ? Math.max(...scoresList)
+      : Math.min(...scoresList);
+    
+    return activePlayers.filter(p => (totalScores[p.id] || 0) === winningScore);
   };
-  const winner = getWinner();
+  const winners = getWinners();
 
   // Tally Tab Match Completed Handler
   const handleTallyMatchCompleted = () => {
     if (activePlayers.length === 0) return;
     
-    // Find absolute winner based on totalScores
-    let absoluteWinner = activePlayers[0];
-    let winningVal = totalScores[absoluteWinner.id] || 0;
+    // Safety guard: check if all active player scores are 0 and no rounds have been logged
+    const scoresList = activePlayers.map(p => totalScores[p.id] || 0);
+    const hasAnyScore = scoresList.some(s => s !== 0);
+    
+    if (!hasAnyScore && rounds.length === 0) {
+      alert("No scores have been recorded yet! Add some scores before ending the match.");
+      return;
+    }
 
-    activePlayers.forEach(p => {
-      const val = totalScores[p.id] || 0;
-      if (activePreset.winCondition === 'highest') {
-        if (val > winningVal) {
-          winningVal = val;
-          absoluteWinner = p;
-        }
-      } else {
-        if (val < winningVal) {
-          winningVal = val;
-          absoluteWinner = p;
-        }
-      }
-    });
+    // Find absolute winners based on totalScores
+    const winningVal = activePreset.winCondition === 'highest'
+      ? Math.max(...scoresList)
+      : Math.min(...scoresList);
+      
+    const absoluteWinners = activePlayers.filter(p => (totalScores[p.id] || 0) === winningVal);
 
     // Celebrate!
     setTimeout(() => {
@@ -668,7 +649,12 @@ function App() {
       });
       sound.playWinFanfare();
       if (isSpeechOn) {
-        sound.speak(`${absoluteWinner.name} wins the match with ${winningVal} points!`);
+        const namesStr = absoluteWinners.map(w => w.name).join(' and ');
+        if (absoluteWinners.length > 1) {
+          sound.speak(`It's a tie! ${namesStr} win the match with ${winningVal} points!`);
+        } else {
+          sound.speak(`${absoluteWinners[0].name} wins the match with ${winningVal} points!`);
+        }
       }
     }, 300);
 
@@ -677,7 +663,7 @@ function App() {
       const isActive = activePlayerIds.includes(p.id);
       if (!isActive) return p;
 
-      const isWinner = p.id === absoluteWinner.id;
+      const isWinner = absoluteWinners.some(w => w.id === p.id);
       const gameScore = totalScores[p.id] || 0;
       const nextPlayed = p.gamesPlayed + 1;
       const nextWon = p.gamesWon + (isWinner ? 1 : 0);
@@ -695,14 +681,14 @@ function App() {
 
     savePlayersToStorage(updatedPlayers);
 
-    // Compile match history record
+    // Compile match history record (with tie-safe winnerName/Id)
     const newMatch: MatchSummary = {
       id: `match_${Date.now()}`,
       date: new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
       presetName: activePreset.name,
       targetScore: targetScore,
-      winnerId: absoluteWinner.id,
-      winnerName: absoluteWinner.name,
+      winnerId: absoluteWinners.map(w => w.id).join(','),
+      winnerName: absoluteWinners.map(w => w.name).join(' & ') + (absoluteWinners.length > 1 ? ' (Tie)' : ''),
       players: activePlayers.map(p => ({
         name: p.name,
         score: totalScores[p.id] || 0,
@@ -841,7 +827,8 @@ function App() {
             rounds={rounds}
             targetScore={targetScore}
             isGameOver={isGameOver}
-            winner={winner}
+            winners={winners}
+            winCondition={activePreset.winCondition}
             onAddRound={handleAddRound}
             onDeleteLastRound={handleDeleteLastRound}
             onDeleteRound={handleDeleteRound}

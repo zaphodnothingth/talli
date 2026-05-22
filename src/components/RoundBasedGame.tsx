@@ -15,7 +15,8 @@ interface RoundBasedGameProps {
   rounds: Round[];
   targetScore: number;
   isGameOver: boolean;
-  winner: Player | null;
+  winners: Player[];
+  winCondition: 'highest' | 'lowest';
   onAddRound: (roundScores: Record<string, number>) => void;
   onDeleteLastRound: () => void;
   onDeleteRound?: (roundId: number) => void;
@@ -33,7 +34,8 @@ export const RoundBasedGame: React.FC<RoundBasedGameProps> = ({
   rounds,
   targetScore,
   isGameOver,
-  winner,
+  winners,
+  winCondition,
   onAddRound,
   onDeleteRound,
   onEditRound,
@@ -105,9 +107,17 @@ export const RoundBasedGame: React.FC<RoundBasedGameProps> = ({
     sound.playMatchPoint();
   };
 
-  // Find who has the lowest/highest scores
+  // Find who has the lowest/highest scores (sorted with winner first!)
   const getSortedStandings = () => {
-    return [...activePlayers].sort((a, b) => (totalScores[a.id] || 0) - (totalScores[b.id] || 0));
+    return [...activePlayers].sort((a, b) => {
+      const scoreA = totalScores[a.id] || 0;
+      const scoreB = totalScores[b.id] || 0;
+      if (winCondition === 'highest') {
+        return scoreB - scoreA;
+      } else {
+        return scoreA - scoreB;
+      }
+    });
   };
 
   const standings = getSortedStandings();
@@ -224,9 +234,18 @@ export const RoundBasedGame: React.FC<RoundBasedGameProps> = ({
         <div className="glass-panel animate-scalein" style={{ padding: '40px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
           <div style={{ fontSize: '48px' }}>🏆</div>
           <div>
-            <h2 style={{ fontSize: '26px' }}>Winner Announced!</h2>
-            <p style={{ fontSize: '16px', color: `hsl(var(${winner?.colorVar}))`, fontWeight: 800, marginTop: '5px' }}>
-              {winner?.name} has won the match!
+            <h2 style={{ fontSize: '26px' }}>
+              {winners.length > 1 ? "It's a Tie!" : "Winner Announced!"}
+            </h2>
+            <p style={{ 
+              fontSize: '16px', 
+              color: winners.length === 1 ? `hsl(var(${winners[0]?.colorVar}))` : 'hsl(var(--accent-warning))', 
+              fontWeight: 800, 
+              marginTop: '5px' 
+            }}>
+              {winners.length > 1 
+                ? `Tie Game between ${winners.map(w => w.name).join(' & ')}!` 
+                : `${winners[0]?.name} has won the match!`}
             </p>
           </div>
 
@@ -242,16 +261,31 @@ export const RoundBasedGame: React.FC<RoundBasedGameProps> = ({
             }}
           >
             <h3 style={{ fontSize: '13px', color: 'hsl(var(--text-muted))', letterSpacing: '0.5px' }}>FINAL STANDINGS</h3>
-            {standings.map((p, index) => (
-              <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', padding: '4px 0' }}>
-                <span style={{ fontWeight: index === 0 ? 800 : 500, color: index === 0 ? `hsl(var(${p.colorVar}))` : 'inherit' }}>
-                  #{index + 1} {p.name}
-                </span>
-                <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
-                  {totalScores[p.id]} pts
-                </span>
-              </div>
-            ))}
+            {standings.map((p, index) => {
+              // Calculate competition rank (1-indexed, supporting shared ranks for ties)
+              let displayRank = index + 1;
+              if (index > 0 && (totalScores[p.id] || 0) === (totalScores[standings[index - 1].id] || 0)) {
+                let firstIndex = index;
+                while (firstIndex > 0 && (totalScores[standings[firstIndex].id] || 0) === (totalScores[standings[firstIndex - 1].id] || 0)) {
+                  firstIndex--;
+                }
+                displayRank = firstIndex + 1;
+              }
+              const isWinner = winners.some(w => w.id === p.id);
+              return (
+                <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', padding: '4px 0' }}>
+                  <span style={{ 
+                    fontWeight: isWinner ? 800 : 500, 
+                    color: isWinner ? `hsl(var(${p.colorVar}))` : 'inherit' 
+                  }}>
+                    #{displayRank} {p.name} {isWinner && '🏆'}
+                  </span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
+                    {totalScores[p.id]} pts
+                  </span>
+                </div>
+              );
+            })}
           </div>
 
           <button 
