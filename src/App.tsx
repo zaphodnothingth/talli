@@ -519,6 +519,29 @@ function App() {
     }
   };
 
+  const handleDeleteRound = (roundId: number) => {
+    pushToUndoStack(scores, rounds);
+    const nextRounds = rounds.filter(r => r.id !== roundId);
+    const reindexedRounds = nextRounds.map((r, idx) => ({
+      ...r,
+      id: idx + 1
+    }));
+    setRounds(reindexedRounds);
+    sound.playUndo();
+  };
+
+  const handleEditRound = (roundId: number, updatedScores: Record<string, number>) => {
+    pushToUndoStack(scores, rounds);
+    const nextRounds = rounds.map(r => {
+      if (r.id === roundId) {
+        return { ...r, scores: updatedScores };
+      }
+      return r;
+    });
+    setRounds(nextRounds);
+    sound.playTick();
+  };
+
   const handleResetGame = () => {
     pushToUndoStack(scores, rounds);
     setRounds([]);
@@ -708,23 +731,17 @@ function App() {
       {/* HEADER SECTION */}
       <header className="app-header glass-panel" style={{ borderTopLeftRadius: 0, borderTopRightRadius: 0, borderRadius: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div 
+          <img 
+            src="./talli_app_icon_1779224598013.png" 
+            alt="Talli Logo"
             style={{ 
               width: '32px', 
               height: '32px', 
               borderRadius: '8px', 
-              background: 'linear-gradient(135deg, hsl(var(--accent-primary)), hsl(var(--accent-secondary)))',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 800,
-              fontSize: '15px',
-              color: '#fff',
-              boxShadow: '0 2px 8px hsl(var(--accent-primary) / 0.4)'
+              boxShadow: '0 2px 8px hsl(var(--accent-primary) / 0.4)',
+              objectFit: 'cover'
             }}
-          >
-            T
-          </div>
+          />
           <span style={{ fontSize: '20px', fontWeight: 800, letterSpacing: '-0.5px' }}>Talli</span>
         </div>
 
@@ -827,6 +844,8 @@ function App() {
             winner={winner}
             onAddRound={handleAddRound}
             onDeleteLastRound={handleDeleteLastRound}
+            onDeleteRound={handleDeleteRound}
+            onEditRound={handleEditRound}
             onResetGame={handleResetGame}
             onSetTargetScore={handleSetTargetScore}
             onAdjustScore={handleAdjustScore}

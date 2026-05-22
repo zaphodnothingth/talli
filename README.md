@@ -1,8 +1,8 @@
-# 🌟 Talli — The Ultimate Scorekeeper
+# <img src="public/talli_app_icon_1779224598013.png" width="38" height="38" align="center" style="border-radius: 8px;" /> Talli — The Ultimate Scorekeeper
 
 Talli is an elite, premium, offline-first Progressive Web App (PWA) designed to track scores for any board game, card game, or sport. Formulated with dynamic glassmorphism, HSL-tailored dark modes, fluid micro-animations, and full Text-to-Speech (TTS) vocalization, Talli replaces ugly, ad-ridden web and mobile scoreboards with a gorgeous, premium, native-feeling user experience.
 
-![Talli App Icon](https://raw.githubusercontent.com/zaphodnothingth/talli/master/scratch/talli_feature_graphic_1779224611511.png)
+![Talli Feature Graphic](https://raw.githubusercontent.com/zaphodnothingth/talli/master/public/talli_feature_graphic_1779224611511.png)
 
 ---
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Minus, User, ArrowRight, AlertTriangle } from 'lucide-react';
+import { Plus, Minus, User, ArrowRight, AlertTriangle, Edit2, Trash2, X } from 'lucide-react';
 import type { Player } from './PlayerManager';
 import { sound } from '../utils/SoundManager';
 
@@ -18,6 +18,8 @@ interface RoundBasedGameProps {
   winner: Player | null;
   onAddRound: (roundScores: Record<string, number>) => void;
   onDeleteLastRound: () => void;
+  onDeleteRound?: (roundId: number) => void;
+  onEditRound?: (roundId: number, updatedScores: Record<string, number>) => void;
   onResetGame: () => void;
   onSetTargetScore: (target: number) => void;
   onAdjustScore?: (playerId: string, delta: number) => void;
@@ -33,7 +35,8 @@ export const RoundBasedGame: React.FC<RoundBasedGameProps> = ({
   isGameOver,
   winner,
   onAddRound,
-  onDeleteLastRound,
+  onDeleteRound,
+  onEditRound,
   onResetGame,
   onSetTargetScore,
   onAdjustScore,
@@ -43,6 +46,11 @@ export const RoundBasedGame: React.FC<RoundBasedGameProps> = ({
   const [roundInputs, setRoundInputs] = useState<Record<string, string>>({});
   const [dealerIndex, setDealerIndex] = useState(0);
   const [animatingId, setAnimatingId] = useState<string | null>(null);
+
+  // States for Manage/Edit Rounds
+  const [showEditRoundsModal, setShowEditRoundsModal] = useState(false);
+  const [editingRoundId, setEditingRoundId] = useState<number | null>(null);
+  const [editRoundInputs, setEditRoundInputs] = useState<Record<string, string>>({});
 
   // Use unified totalScores prop
 
@@ -169,16 +177,13 @@ export const RoundBasedGame: React.FC<RoundBasedGameProps> = ({
             {rounds.length > 0 && !isGameOver && (
               <button
                 className="btn-premium"
-                style={{ padding: '8px 12px', fontSize: '12px', color: 'hsl(var(--accent-danger))' }}
+                style={{ padding: '8px 12px', fontSize: '12px', color: 'hsl(var(--accent-primary))', borderColor: 'hsl(var(--accent-primary) / 0.3)' }}
                 onClick={() => {
-                  sound.playUndo();
-                  if (confirm("Undo and delete last round scores?")) {
-                    onDeleteLastRound();
-                    setDealerIndex(prev => (prev - 1 + activePlayers.length) % activePlayers.length);
-                  }
+                  sound.playTick();
+                  setShowEditRoundsModal(true);
                 }}
               >
-                Undo Rd
+                Edit Rounds
               </button>
             )}
 
@@ -601,6 +606,236 @@ export const RoundBasedGame: React.FC<RoundBasedGameProps> = ({
                 Save Round Scores <ArrowRight size={16} />
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT ROUNDS MODAL */}
+      {showEditRoundsModal && (
+        <div className="action-sheet-overlay" onClick={() => setShowEditRoundsModal(false)}>
+          <div className="action-sheet animate-slideup" onClick={(e) => e.stopPropagation()} style={{ maxHeight: '85vh', overflowY: 'auto' }}>
+            <div className="flex-row-center" style={{ marginBottom: '16px' }}>
+              <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>Manage Rounds</span>
+                <span style={{ fontSize: '11px', padding: '2px 8px', background: 'hsl(var(--border-light) / 0.5)', borderRadius: '12px', fontWeight: 600, color: 'hsl(var(--text-secondary))' }}>
+                  {rounds.length} Total
+                </span>
+              </h2>
+              <button 
+                className="btn-icon-circle"
+                onClick={() => setShowEditRoundsModal(false)}
+                style={{ background: 'hsl(var(--border-light) / 0.3)', width: '30px', height: '30px' }}
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            {editingRoundId !== null ? (
+              /* SUB-SHEET FOR EDITING A SPECIFIC ROUND */
+              <div className="animate-scalein" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div className="flex-row-center" style={{ padding: '8px 12px', background: 'hsl(var(--accent-primary) / 0.08)', borderRadius: '8px', border: '1px solid hsl(var(--accent-primary) / 0.2)' }}>
+                  <span style={{ fontWeight: 700, color: 'hsl(var(--accent-primary))' }}>Editing Round {editingRoundId} Scores</span>
+                  <button 
+                    className="btn-premium"
+                    style={{ padding: '4px 8px', fontSize: '11px' }}
+                    onClick={() => setEditingRoundId(null)}
+                  >
+                    Back
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {activePlayers.map(player => (
+                    <div key={player.id} className="flex-row-center" style={{ gap: '15px', padding: '6px 0', borderBottom: '1px solid hsl(var(--border-light) / 0.3)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
+                        <div 
+                          style={{ 
+                            width: '12px', 
+                            height: '12px', 
+                            borderRadius: '4px', 
+                            background: `hsl(var(${player.colorVar}))` 
+                          }}
+                        />
+                        <span style={{ fontWeight: 700 }}>{player.name}</span>
+                      </div>
+
+                      {/* Quick Adjust Buttons */}
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <button
+                          type="button"
+                          className="btn-premium"
+                          style={{ padding: '4px 8px', fontSize: '11px', borderRadius: '6px', minWidth: '30px' }}
+                          onClick={() => {
+                            setEditRoundInputs(prev => {
+                              const cur = parseInt(prev[player.id]) || 0;
+                              return { ...prev, [player.id]: (cur - 1).toString() };
+                            });
+                            sound.playTick();
+                          }}
+                        >
+                          -1
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-premium"
+                          style={{ padding: '4px 8px', fontSize: '11px', borderRadius: '6px', minWidth: '30px', color: 'hsl(var(--accent-primary))', borderColor: 'hsl(var(--accent-primary) / 0.3)' }}
+                          onClick={() => {
+                            setEditRoundInputs(prev => {
+                              const cur = parseInt(prev[player.id]) || 0;
+                              return { ...prev, [player.id]: (cur + 1).toString() };
+                            });
+                            sound.playTick();
+                          }}
+                        >
+                          +1
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-premium"
+                          style={{ padding: '4px 8px', fontSize: '11px', borderRadius: '6px', minWidth: '30px', color: 'hsl(var(--accent-secondary))', borderColor: 'hsl(var(--accent-secondary) / 0.3)' }}
+                          onClick={() => {
+                            setEditRoundInputs(prev => {
+                              const cur = parseInt(prev[player.id]) || 0;
+                              return { ...prev, [player.id]: (cur + 5).toString() };
+                            });
+                            sound.playTick();
+                          }}
+                        >
+                          +5
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-premium"
+                          style={{ padding: '4px 8px', fontSize: '11px', borderRadius: '6px', minWidth: '34px', color: 'hsl(var(--accent-success))', borderColor: 'hsl(var(--accent-success) / 0.3)' }}
+                          onClick={() => {
+                            setEditRoundInputs(prev => {
+                              const cur = parseInt(prev[player.id]) || 0;
+                              return { ...prev, [player.id]: (cur + 10).toString() };
+                            });
+                            sound.playTick();
+                          }}
+                        >
+                          +10
+                        </button>
+                      </div>
+
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="^-?[0-9]*$"
+                        placeholder="0"
+                        className="input-premium"
+                        style={{ width: '70px', textAlign: 'center', padding: '8px', fontFamily: 'var(--font-mono)' }}
+                        value={editRoundInputs[player.id] ?? ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === '' || val === '-' || /^-?\d*$/.test(val)) {
+                            setEditRoundInputs(prev => ({ ...prev, [player.id]: val }));
+                          }
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+                  <button
+                    className="btn-premium"
+                    style={{ flex: 1, padding: '12px' }}
+                    onClick={() => setEditingRoundId(null)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="btn-premium btn-primary-glow"
+                    style={{ flex: 2, padding: '12px' }}
+                    onClick={() => {
+                      if (editingRoundId !== null && onEditRound) {
+                        const updated: Record<string, number> = {};
+                        activePlayers.forEach(p => {
+                          updated[p.id] = parseInt(editRoundInputs[p.id]) || 0;
+                        });
+                        onEditRound(editingRoundId, updated);
+                        setEditingRoundId(null);
+                      }
+                    }}
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* LIST OF ROUNDS TO EDIT OR DELETE */
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {rounds.length === 0 ? (
+                  <div style={{ padding: '24px 0', textAlign: 'center', color: 'hsl(var(--text-muted))' }}>
+                    No rounds logged yet.
+                  </div>
+                ) : (
+                  [...rounds].reverse().map(round => (
+                    <div 
+                      key={round.id}
+                      className="glass-card"
+                      style={{ 
+                        padding: '12px 16px', 
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        gap: '8px', 
+                        background: 'hsl(var(--bg-app) / 0.4)',
+                        borderColor: 'hsl(var(--border-light) / 0.4)'
+                      }}
+                    >
+                      <div className="flex-row-center">
+                        <span style={{ fontWeight: 800, fontSize: '15px' }}>Round {round.id}</span>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button
+                            className="btn-icon-circle"
+                            style={{ width: '30px', height: '30px', color: 'hsl(var(--accent-primary))', background: 'hsl(var(--accent-primary) / 0.1)', borderColor: 'hsl(var(--accent-primary) / 0.2)' }}
+                            onClick={() => {
+                              sound.playDing();
+                              setEditingRoundId(round.id);
+                              const inputs: Record<string, string> = {};
+                              activePlayers.forEach(p => {
+                                inputs[p.id] = (round.scores[p.id] || 0).toString();
+                              });
+                              setEditRoundInputs(inputs);
+                            }}
+                            title="Edit scores"
+                          >
+                            <Edit2 size={13} />
+                          </button>
+                          <button
+                            className="btn-icon-circle"
+                            style={{ width: '30px', height: '30px', color: 'hsl(var(--accent-danger))', background: 'hsl(var(--accent-danger) / 0.1)', borderColor: 'hsl(var(--accent-danger) / 0.2)' }}
+                            onClick={() => {
+                              if (window.confirm(`Are you sure you want to delete Round ${round.id}? This will shift down all subsequent rounds.`)) {
+                                if (onDeleteRound) {
+                                  onDeleteRound(round.id);
+                                }
+                              }
+                            }}
+                            title="Delete round"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', fontSize: '13px' }}>
+                        {activePlayers.map(p => (
+                          <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ color: 'hsl(var(--text-muted))' }}>{p.name.slice(0, 3)}:</span>
+                            <strong style={{ fontFamily: 'var(--font-mono)', color: `hsl(var(${p.colorVar}))` }}>
+                              {round.scores[p.id] || 0}
+                            </strong>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
