@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Minus, Plus, RotateCcw, Volume2 } from 'lucide-react';
+import { Minus, RotateCcw, Volume2 } from 'lucide-react';
 import type { Player } from './PlayerManager';
 import { sound } from '../utils/SoundManager';
 
@@ -179,13 +179,13 @@ export const QuickCounter: React.FC<QuickCounterProps> = ({
                 </div>
 
                 {/* Score Controls */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }} onClick={(e) => e.stopPropagation()}>
                   <button
                     className="btn-icon-circle"
-                    style={{ width: '38px', height: '38px' }}
+                    style={{ width: '36px', height: '36px' }}
                     onClick={(e) => handleDecrement(player.id, e)}
                   >
-                    <Minus size={16} />
+                    <Minus size={14} />
                   </button>
 
                   <span
@@ -194,7 +194,7 @@ export const QuickCounter: React.FC<QuickCounterProps> = ({
                       fontSize: '32px',
                       fontWeight: 800,
                       fontFamily: 'var(--font-mono)',
-                      minWidth: '50px',
+                      minWidth: '48px',
                       textAlign: 'center',
                       color: `hsl(var(${player.colorVar}))`,
                       textShadow: `0 0 15px hsl(var(${player.colorVar}) / 0.2)`
@@ -203,20 +203,78 @@ export const QuickCounter: React.FC<QuickCounterProps> = ({
                     {score}
                   </span>
 
-                  <button
-                    className="btn-icon-circle"
-                    style={{ 
-                      width: '38px', 
-                      height: '38px', 
-                      background: `hsl(var(${player.colorVar}))`, 
-                      border: 'none',
-                      color: '#fff',
-                      boxShadow: `0 4px 10px hsl(var(${player.colorVar}) / 0.2)`
-                    }}
-                    onClick={(e) => { e.stopPropagation(); handleIncrement(player.id); }}
-                  >
-                    <Plus size={16} />
-                  </button>
+                  {/* Explicit Quick Increment Buttons */}
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button
+                      className="btn-premium"
+                      style={{ 
+                        padding: '6px 10px', 
+                        fontSize: '12px', 
+                        fontWeight: 700, 
+                        borderRadius: '8px', 
+                        minWidth: '36px',
+                        background: 'hsl(var(--bg-app) / 0.6)',
+                        borderColor: `hsl(var(${player.colorVar}) / 0.3)`,
+                        color: `hsl(var(${player.colorVar}))`
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        sound.playDing();
+                        setAnimatingId(player.id);
+                        setTimeout(() => setAnimatingId(null), 300);
+                        onAdjustScore(player.id, 1);
+                      }}
+                    >
+                      +1
+                    </button>
+                    
+                    <button
+                      className="btn-premium"
+                      style={{ 
+                        padding: '6px 10px', 
+                        fontSize: '12px', 
+                        fontWeight: 700, 
+                        borderRadius: '8px', 
+                        minWidth: '36px',
+                        background: 'hsl(var(--bg-app) / 0.6)',
+                        borderColor: `hsl(var(${player.colorVar}) / 0.5)`,
+                        color: `hsl(var(${player.colorVar}))`
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        sound.playDing();
+                        setAnimatingId(player.id);
+                        setTimeout(() => setAnimatingId(null), 300);
+                        onAdjustScore(player.id, 5);
+                      }}
+                    >
+                      +5
+                    </button>
+
+                    <button
+                      className="btn-premium"
+                      style={{ 
+                        padding: '6px 10px', 
+                        fontSize: '12px', 
+                        fontWeight: 700, 
+                        borderRadius: '8px', 
+                        minWidth: '38px',
+                        background: `hsl(var(${player.colorVar}))`, 
+                        border: 'none',
+                        color: '#fff',
+                        boxShadow: `0 4px 10px hsl(var(${player.colorVar}) / 0.2)`
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        sound.playDing();
+                        setAnimatingId(player.id);
+                        setTimeout(() => setAnimatingId(null), 300);
+                        onAdjustScore(player.id, 10);
+                      }}
+                    >
+                      +10
+                    </button>
+                  </div>
                 </div>
               </div>
             );

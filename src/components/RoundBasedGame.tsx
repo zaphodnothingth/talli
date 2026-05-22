@@ -11,6 +11,7 @@ interface Round {
 interface RoundBasedGameProps {
   activePlayers: Player[];
   totalScores: Record<string, number>;
+  scores?: Record<string, number>;
   rounds: Round[];
   targetScore: number;
   isGameOver: boolean;
@@ -24,6 +25,7 @@ interface RoundBasedGameProps {
 export const RoundBasedGame: React.FC<RoundBasedGameProps> = ({
   activePlayers,
   totalScores,
+  scores,
   rounds,
   targetScore,
   isGameOver,
@@ -44,7 +46,8 @@ export const RoundBasedGame: React.FC<RoundBasedGameProps> = ({
     sound.playDing();
     const initialInputs: Record<string, string> = {};
     activePlayers.forEach(p => {
-      initialInputs[p.id] = '';
+      const tallyVal = scores?.[p.id] || 0;
+      initialInputs[p.id] = tallyVal !== 0 ? tallyVal.toString() : '';
     });
     setRoundInputs(initialInputs);
     setShowInputModal(true);
@@ -60,8 +63,20 @@ export const RoundBasedGame: React.FC<RoundBasedGameProps> = ({
     }
   };
 
-  const handleSaveRound = (e: React.FormEvent) => {
-    e.preventDefault();
+  const adjustInputValue = (playerId: string, delta: number) => {
+    setRoundInputs(prev => {
+      const currentVal = parseInt(prev[playerId]) || 0;
+      const newVal = currentVal + delta;
+      return {
+        ...prev,
+        [playerId]: newVal.toString()
+      };
+    });
+    sound.playTick();
+  };
+
+  const handleSaveRound = (e?: React.FormEvent | React.MouseEvent) => {
+    if (e) e.preventDefault();
     
     const roundScores: Record<string, number> = {};
     activePlayers.forEach(p => {
@@ -340,19 +355,30 @@ export const RoundBasedGame: React.FC<RoundBasedGameProps> = ({
           <div className="action-sheet animate-slideup" onClick={(e) => e.stopPropagation()}>
             <div className="flex-row-center">
               <h2>Enter Round {rounds.length + 1} Points</h2>
-              <button 
-                className="btn-premium" 
-                style={{ padding: '6px 12px', fontSize: '12px' }}
-                onClick={() => setShowInputModal(false)}
-              >
-                Cancel
-              </button>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button 
+                  type="button"
+                  className="btn-premium" 
+                  style={{ padding: '6px 12px', fontSize: '12px', color: 'hsl(var(--accent-success))', borderColor: 'hsl(var(--accent-success) / 0.3)' }}
+                  onClick={(e) => handleSaveRound(e)}
+                >
+                  Save
+                </button>
+                <button 
+                  type="button"
+                  className="btn-premium" 
+                  style={{ padding: '6px 12px', fontSize: '12px' }}
+                  onClick={() => setShowInputModal(false)}
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
 
             <form onSubmit={handleSaveRound} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {activePlayers.map((player) => (
-                  <div key={player.id} className="flex-row-center" style={{ gap: '15px' }}>
+                  <div key={player.id} className="flex-row-center" style={{ gap: '15px', padding: '6px 0', borderBottom: '1px solid hsl(var(--border-light) / 0.3)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
                       <div 
                         style={{ 
@@ -365,14 +391,50 @@ export const RoundBasedGame: React.FC<RoundBasedGameProps> = ({
                       <span style={{ fontWeight: 700 }}>{player.name}</span>
                     </div>
 
+                    {/* Quick increment / decrement buttons */}
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button
+                        type="button"
+                        className="btn-premium"
+                        style={{ padding: '4px 8px', fontSize: '11px', borderRadius: '6px', minWidth: '30px' }}
+                        onClick={() => adjustInputValue(player.id, -1)}
+                      >
+                        -1
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-premium"
+                        style={{ padding: '4px 8px', fontSize: '11px', borderRadius: '6px', minWidth: '30px', color: 'hsl(var(--accent-primary))', borderColor: 'hsl(var(--accent-primary) / 0.3)' }}
+                        onClick={() => adjustInputValue(player.id, 1)}
+                      >
+                        +1
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-premium"
+                        style={{ padding: '4px 8px', fontSize: '11px', borderRadius: '6px', minWidth: '30px', color: 'hsl(var(--accent-secondary))', borderColor: 'hsl(var(--accent-secondary) / 0.3)' }}
+                        onClick={() => adjustInputValue(player.id, 5)}
+                      >
+                        +5
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-premium"
+                        style={{ padding: '4px 8px', fontSize: '11px', borderRadius: '6px', minWidth: '34px', color: 'hsl(var(--accent-success))', borderColor: 'hsl(var(--accent-success) / 0.3)' }}
+                        onClick={() => adjustInputValue(player.id, 10)}
+                      >
+                        +10
+                      </button>
+                    </div>
+
                     <input
                       type="text"
                       inputMode="numeric"
                       pattern="^-?[0-9]*$"
                       placeholder="0"
                       className="input-premium"
-                      style={{ width: '100px', textAlign: 'center', padding: '10px', fontFamily: 'var(--font-mono)' }}
-                      value={roundInputs[player.id] || ''}
+                      style={{ width: '70px', textAlign: 'center', padding: '8px', fontFamily: 'var(--font-mono)' }}
+                      value={roundInputs[player.id] ?? ''}
                       onChange={(e) => handleInputChange(player.id, e.target.value)}
                     />
                   </div>

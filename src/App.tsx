@@ -105,6 +105,15 @@ function App() {
     }
   };
 
+  const handleDeleteMatches = (matchIds: string[]) => {
+    setMatchHistory(prev => {
+      const nextHistory = prev.filter(m => !matchIds.includes(m.id));
+      localStorage.setItem('talli_match_history', JSON.stringify(nextHistory));
+      return nextHistory;
+    });
+    sound.playUndo();
+  };
+
   // Initialize data from LocalStorage
   useEffect(() => {
     const savedPlayers = localStorage.getItem('talli_players');
@@ -352,6 +361,12 @@ function App() {
 
     const nextRounds = [...rounds, newRound];
     setRounds(nextRounds);
+
+    const reset: Record<string, number> = {};
+    activePlayerIds.forEach(id => {
+      reset[id] = 0;
+    });
+    setScores(reset);
 
     // Calculate dynamic standings totals
     const totals: Record<string, number> = {};
@@ -794,6 +809,7 @@ function App() {
           <RoundBasedGame
             activePlayers={activePlayers}
             totalScores={totalScores}
+            scores={scores}
             rounds={rounds}
             targetScore={targetScore}
             isGameOver={isGameOver}
@@ -837,6 +853,7 @@ function App() {
             gameMode={rounds.length > 0 ? 'round' : (activePreset.mode === 'versus' ? 'versus' : 'tally')}
             matchHistory={matchHistory}
             onClearHistory={handleClearHistory}
+            onDeleteMatches={handleDeleteMatches}
           />
         )}
 
