@@ -9,6 +9,8 @@ interface QuickCounterProps {
   onAdjustScore: (playerId: string, delta: number) => void;
   onResetScores: () => void;
   onMatchCompleted: () => void;
+  activePresetMode?: 'counters' | 'rounds' | 'versus';
+  onSaveRound?: (roundScores: Record<string, number>) => void;
 }
 
 export const QuickCounter: React.FC<QuickCounterProps> = ({
@@ -16,7 +18,9 @@ export const QuickCounter: React.FC<QuickCounterProps> = ({
   totalScores,
   onAdjustScore,
   onResetScores,
-  onMatchCompleted
+  onMatchCompleted,
+  activePresetMode,
+  onSaveRound
 }) => {
   const [step, setStep] = useState<number>(1);
   const [animatingId, setAnimatingId] = useState<string | null>(null);
@@ -99,7 +103,7 @@ export const QuickCounter: React.FC<QuickCounterProps> = ({
           ))}
         </div>
 
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <button
             className="btn-premium"
             style={{ padding: '8px', color: 'hsl(var(--accent-secondary))' }}
@@ -109,6 +113,25 @@ export const QuickCounter: React.FC<QuickCounterProps> = ({
             <Volume2 size={16} />
           </button>
           
+          {activePresetMode === 'rounds' && onSaveRound && (
+            <button
+              className="btn-premium btn-primary-glow"
+              style={{ 
+                padding: '8px 12px', 
+                fontSize: '11px', 
+                color: 'hsl(var(--accent-primary))', 
+                borderColor: 'hsl(var(--accent-primary) / 0.3)' 
+              }}
+              onClick={() => {
+                sound.playMatchPoint();
+                onSaveRound(totalScores);
+              }}
+              title="Save Round"
+            >
+              Save Rd
+            </button>
+          )}
+
           <button
             className="btn-premium"
             style={{ padding: '8px 12px', fontSize: '11px', color: 'hsl(var(--accent-success))' }}

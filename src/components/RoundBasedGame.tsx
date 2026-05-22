@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, User, ArrowRight, AlertTriangle } from 'lucide-react';
+import { Plus, Minus, User, ArrowRight, AlertTriangle } from 'lucide-react';
 import type { Player } from './PlayerManager';
 import { sound } from '../utils/SoundManager';
 
@@ -20,6 +20,8 @@ interface RoundBasedGameProps {
   onDeleteLastRound: () => void;
   onResetGame: () => void;
   onSetTargetScore: (target: number) => void;
+  onAdjustScore?: (playerId: string, delta: number) => void;
+  onMatchCompleted?: () => void;
 }
 
 export const RoundBasedGame: React.FC<RoundBasedGameProps> = ({
@@ -33,11 +35,14 @@ export const RoundBasedGame: React.FC<RoundBasedGameProps> = ({
   onAddRound,
   onDeleteLastRound,
   onResetGame,
-  onSetTargetScore
+  onSetTargetScore,
+  onAdjustScore,
+  onMatchCompleted
 }) => {
   const [showInputModal, setShowInputModal] = useState(false);
   const [roundInputs, setRoundInputs] = useState<Record<string, string>>({});
   const [dealerIndex, setDealerIndex] = useState(0);
+  const [animatingId, setAnimatingId] = useState<string | null>(null);
 
   // Use unified totalScores prop
 
@@ -129,7 +134,38 @@ export const RoundBasedGame: React.FC<RoundBasedGameProps> = ({
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+            {/* Save Round Button */}
+            {!isGameOver && (
+              <button
+                className="btn-premium btn-primary-glow"
+                style={{ padding: '8px 12px', fontSize: '12px', color: 'hsl(var(--accent-primary))', borderColor: 'hsl(var(--accent-primary) / 0.3)' }}
+                onClick={() => {
+                  sound.playMatchPoint();
+                  onAddRound(scores || {});
+                }}
+                title="Save Round"
+              >
+                Save Rd
+              </button>
+            )}
+
+            {/* End Match Button */}
+            {onMatchCompleted && !isGameOver && (
+              <button
+                className="btn-premium"
+                style={{ padding: '8px 12px', fontSize: '12px', color: 'hsl(var(--accent-success))' }}
+                onClick={() => {
+                  if (window.confirm("Finish match and save to history?")) {
+                    onMatchCompleted();
+                  }
+                }}
+                title="End Match"
+              >
+                End Match
+              </button>
+            )}
+
             {rounds.length > 0 && !isGameOver && (
               <button
                 className="btn-premium"
@@ -241,20 +277,38 @@ export const RoundBasedGame: React.FC<RoundBasedGameProps> = ({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1 }}>
           
           {/* Quick stand list */}
-          <div className="player-grid">
+          {/* Quick stand list */}
+          <div className="player-grid" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {activePlayers.map((player) => {
-              const score = totalScores[player.id] || 0;
-              const percentOfTarget = Math.min(100, Math.max(0, (score / targetScore) * 100));
-              const isWarning = score >= targetScore * 0.8;
+              const activeRoundScore = scores?.[player.id] || 0;
+              const cumulativeSavedScore = rounds.reduce((sum, r) => sum + (r.scores[player.id] || 0), 0);
+              const totalGameScore = cumulativeSavedScore + activeRoundScore;
+              const percentOfTarget = Math.min(100, Math.max(0, (totalGameScore / targetScore) * 100));
+              const isWarning = totalGameScore >= targetScore * 0.8;
+              const isAnimating = animatingId === player.id;
 
               return (
                 <div 
                   key={player.id} 
                   className="glass-card" 
                   style={{ 
-                    padding: '12px 16px',
+                    padding: '14px 18px',
                     position: 'relative',
-                    overflow: 'hidden'
+                    overflow: 'hidden',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    borderColor: `hsl(var(${player.colorVar}) / 0.3)`,
+                    background: `linear-gradient(90deg, hsl(var(${player.colorVar}) / 0.04) 0%, hsl(var(--bg-card)) 100%)`,
+                    cursor: onAdjustScore ? 'pointer' : 'default'
+                  }}
+                  onClick={() => {
+                    if (onAdjustScore) {
+                      sound.playDing();
+                      setAnimatingId(player.id);
+                      setTimeout(() => setAnimatingId(null), 300);
+                      onAdjustScore(player.id, 1);
+                    }
                   }}
                 >
                   {/* Glowing background progress bar */}
@@ -266,37 +320,139 @@ export const RoundBasedGame: React.FC<RoundBasedGameProps> = ({
                       bottom: 0,
                       width: `${percentOfTarget}%`,
                       background: `hsl(var(${player.colorVar}) / 0.05)`,
-                      borderRight: score > 0 ? `2px solid hsl(var(${player.colorVar}) / 0.2)` : 'none',
+                      borderRight: totalGameScore > 0 ? `2px solid hsl(var(${player.colorVar}) / 0.2)` : 'none',
                       transition: 'width 0.4s ease-out',
                       pointerEvents: 'none'
                     }}
                   />
                   
-                  <div className="flex-row-center" style={{ position: 'relative', zIndex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  {/* Left Column: Player Details & Cumulative Saved Score */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', position: 'relative', zIndex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <div 
                         style={{ 
-                          width: '8px', 
-                          height: '8px', 
-                          borderRadius: 'full', 
+                          width: '10px', 
+                          height: '10px', 
+                          borderRadius: '50%', 
                           background: `hsl(var(${player.colorVar}))`,
-                          boxShadow: `0 0 8px hsl(var(${player.colorVar}))`
+                          boxShadow: `0 0 8px hsl(var(${player.colorVar}) / 0.5)`
                         }}
                       />
-                      <span style={{ fontWeight: 700 }}>{player.name}</span>
+                      <span style={{ fontWeight: 700, fontSize: '15px' }}>{player.name}</span>
                       {isWarning && <AlertTriangle size={13} style={{ color: 'hsl(var(--accent-danger))' }} />}
                     </div>
+                    
+                    <span style={{ fontSize: '11px', color: 'hsl(var(--text-muted))', fontWeight: 600 }}>
+                      Total: <strong style={{ color: 'hsl(var(--text-secondary))', fontFamily: 'var(--font-mono)' }}>{totalGameScore}</strong> / {targetScore} pts
+                    </span>
+                  </div>
 
-                    <span 
-                      style={{ 
-                        fontFamily: 'var(--font-mono)', 
-                        fontSize: '22px', 
-                        fontWeight: 800,
-                        color: isWarning ? 'hsl(var(--accent-danger))' : 'inherit'
+                  {/* Right Column: Score adjustment pills & Active round score */}
+                  <div 
+                    style={{ display: 'flex', alignItems: 'center', gap: '10px', position: 'relative', zIndex: 1 }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {onAdjustScore && (
+                      <button
+                        className="btn-icon-circle"
+                        style={{ width: '32px', height: '32px' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          sound.playTickDown();
+                          setAnimatingId(player.id);
+                          setTimeout(() => setAnimatingId(null), 300);
+                          onAdjustScore(player.id, -1);
+                        }}
+                      >
+                        <Minus size={13} />
+                      </button>
+                    )}
+
+                    <span
+                      className={isAnimating ? 'animate-pop' : ''}
+                      style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: '24px',
+                        fontWeight: 850,
+                        minWidth: '40px',
+                        textAlign: 'center',
+                        color: activeRoundScore > 0 ? `hsl(var(${player.colorVar}))` : 'hsl(var(--text-muted))',
+                        textShadow: activeRoundScore > 0 ? `0 0 12px hsl(var(${player.colorVar}) / 0.3)` : 'none'
                       }}
                     >
-                      {score} <span style={{ fontSize: '11px', color: 'hsl(var(--text-muted))', fontWeight: 500 }}>/ {targetScore}</span>
+                      {activeRoundScore > 0 ? `+${activeRoundScore}` : activeRoundScore}
                     </span>
+
+                    {onAdjustScore && (
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <button
+                          className="btn-premium"
+                          style={{ 
+                            padding: '4px 8px', 
+                            fontSize: '11px', 
+                            fontWeight: 700, 
+                            borderRadius: '6px', 
+                            minWidth: '32px',
+                            background: 'hsl(var(--bg-app) / 0.6)',
+                            borderColor: `hsl(var(${player.colorVar}) / 0.3)`,
+                            color: `hsl(var(${player.colorVar}))`
+                          }}
+                          onClick={() => {
+                            sound.playDing();
+                            setAnimatingId(player.id);
+                            setTimeout(() => setAnimatingId(null), 300);
+                            onAdjustScore(player.id, 1);
+                          }}
+                        >
+                          +1
+                        </button>
+                        
+                        <button
+                          className="btn-premium"
+                          style={{ 
+                            padding: '4px 8px', 
+                            fontSize: '11px', 
+                            fontWeight: 700, 
+                            borderRadius: '6px', 
+                            minWidth: '32px',
+                            background: 'hsl(var(--bg-app) / 0.6)',
+                            borderColor: `hsl(var(${player.colorVar}) / 0.5)`,
+                            color: `hsl(var(${player.colorVar}))`
+                          }}
+                          onClick={() => {
+                            sound.playDing();
+                            setAnimatingId(player.id);
+                            setTimeout(() => setAnimatingId(null), 300);
+                            onAdjustScore(player.id, 5);
+                          }}
+                        >
+                          +5
+                        </button>
+
+                        <button
+                          className="btn-premium"
+                          style={{ 
+                            padding: '4px 8px', 
+                            fontSize: '11px', 
+                            fontWeight: 700, 
+                            borderRadius: '6px', 
+                            minWidth: '34px',
+                            background: `hsl(var(${player.colorVar}))`, 
+                            border: 'none',
+                            color: '#fff',
+                            boxShadow: `0 3px 8px hsl(var(${player.colorVar}) / 0.2)`
+                          }}
+                          onClick={() => {
+                            sound.playDing();
+                            setAnimatingId(player.id);
+                            setTimeout(() => setAnimatingId(null), 300);
+                            onAdjustScore(player.id, 10);
+                          }}
+                        >
+                          +10
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               );

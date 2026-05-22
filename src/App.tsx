@@ -522,6 +522,11 @@ function App() {
   const handleResetGame = () => {
     pushToUndoStack(scores, rounds);
     setRounds([]);
+    const reset: Record<string, number> = {};
+    activePlayerIds.forEach(id => {
+      reset[id] = 0;
+    });
+    setScores(reset);
   };
 
   // Preference Toggles
@@ -806,6 +811,8 @@ function App() {
             onAdjustScore={handleAdjustScore}
             onResetScores={handleResetScores}
             onMatchCompleted={handleTallyMatchCompleted}
+            activePresetMode={activePreset.mode}
+            onSaveRound={handleAddRound}
           />
         )}
 
@@ -822,6 +829,8 @@ function App() {
             onDeleteLastRound={handleDeleteLastRound}
             onResetGame={handleResetGame}
             onSetTargetScore={handleSetTargetScore}
+            onAdjustScore={handleAdjustScore}
+            onMatchCompleted={handleTallyMatchCompleted}
           />
         )}
 
