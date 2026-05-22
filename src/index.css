@@ -308,13 +308,12 @@ p { font-size: 14px; color: hsl(var(--text-secondary)); font-weight: 400; line-h
   box-shadow: 0 0 10px hsl(var(--accent-primary) / 0.15);
 }
 
-/* Modals & Action Sheets */
 .action-sheet-overlay {
-  position: absolute;
+  position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(4px);
-  z-index: 100;
+  z-index: 1000;
   display: flex;
   align-items: flex-end;
   animation: fadeIn 0.25s ease-out;
@@ -333,6 +332,21 @@ p { font-size: 14px; color: hsl(var(--text-secondary)); font-weight: 400; line-h
   display: flex;
   flex-direction: column;
   gap: 20px;
+  box-sizing: border-box;
+}
+
+@media (min-width: 768px) {
+  .action-sheet-overlay {
+    align-items: center;
+    justify-content: center;
+  }
+  .action-sheet {
+    width: 90%;
+    max-width: 540px;
+    border-radius: var(--radius-lg);
+    border: 1px solid hsl(var(--border-glow));
+    max-height: 80%;
+  }
 }
 
 /* Form Helper Grid */

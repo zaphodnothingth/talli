@@ -174,18 +174,7 @@ export const RoundBasedGame: React.FC<RoundBasedGameProps> = ({
               </button>
             )}
 
-            {rounds.length > 0 && !isGameOver && (
-              <button
-                className="btn-premium"
-                style={{ padding: '8px 12px', fontSize: '12px', color: 'hsl(var(--accent-primary))', borderColor: 'hsl(var(--accent-primary) / 0.3)' }}
-                onClick={() => {
-                  sound.playTick();
-                  setShowEditRoundsModal(true);
-                }}
-              >
-                Edit Rounds
-              </button>
-            )}
+
 
             <button
               className="btn-premium"
@@ -476,7 +465,27 @@ export const RoundBasedGame: React.FC<RoundBasedGameProps> = ({
           {/* Round History Log */}
           {rounds.length > 0 && (
             <div className="glass-panel" style={{ flex: 1, padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto' }}>
-              <h3 style={{ fontSize: '13px', color: 'hsl(var(--text-muted))', letterSpacing: '0.5px' }}>ROUND LOGS</h3>
+              <div className="flex-row-center" style={{ width: '100%' }}>
+                <h3 style={{ fontSize: '13px', color: 'hsl(var(--text-muted))', letterSpacing: '0.5px', margin: 0 }}>ROUND LOGS</h3>
+                <button
+                  className="btn-icon-circle"
+                  style={{ 
+                    width: '32px', 
+                    height: '32px', 
+                    background: 'hsl(var(--accent-primary) / 0.12)', 
+                    borderColor: 'hsl(var(--accent-primary) / 0.35)', 
+                    color: 'hsl(var(--accent-primary))',
+                    boxShadow: '0 0 10px hsl(var(--accent-primary) / 0.15)'
+                  }}
+                  onClick={() => {
+                    sound.playTick();
+                    setShowEditRoundsModal(true);
+                  }}
+                  title="Edit/Manage Rounds"
+                >
+                  <Edit2 size={14} />
+                </button>
+              </div>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {[...rounds].reverse().map((round) => (
