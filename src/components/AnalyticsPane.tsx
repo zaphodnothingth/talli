@@ -2,6 +2,7 @@ import React from 'react';
 import { TrendingUp, Shield, Flame, Calendar, Trash2, Trophy, Edit3, X, CheckSquare, Square } from 'lucide-react';
 import type { Player } from './PlayerManager';
 import type { MatchSummary } from '../App';
+import { sound } from '../utils/SoundManager';
 
 interface Round {
   id: number;
@@ -150,6 +151,7 @@ export const AnalyticsPane: React.FC<AnalyticsPaneProps> = ({
 }) => {
   const [isEditMode, setIsEditMode] = React.useState(false);
   const [selectedMatchIds, setSelectedMatchIds] = React.useState<string[]>([]);
+  const [isHistoryExpanded, setIsHistoryExpanded] = React.useState(false);
 
   const handleToggleSelect = (matchId: string) => {
     setSelectedMatchIds(prev => 
@@ -394,20 +396,6 @@ export const AnalyticsPane: React.FC<AnalyticsPaneProps> = ({
   return (
     <div className="animate-fadein flex flex-col gap-4" style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1, overflowY: 'auto' }}>
       
-      {/* Live Chart Canvas */}
-      <div className="glass-panel" style={{ padding: '20px' }}>
-        <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '15px' }}>
-          <TrendingUp size={18} style={{ color: 'hsl(var(--accent-secondary))' }} />
-          Score Progression
-        </h3>
-        
-        {hasActiveData ? renderSVGChart() : (
-          <div style={{ padding: '24px 12px', textAlign: 'center', color: 'hsl(var(--text-muted))', fontSize: '13px' }}>
-            No active game scoring yet. Add rounds in the game tab to populate real-time charts!
-          </div>
-        )}
-      </div>
-
       {/* Insight Badges / Fun Stats */}
       {gameMode === 'round' && roundStats && roundStats.highestRoundPlayer && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -568,129 +556,171 @@ export const AnalyticsPane: React.FC<AnalyticsPaneProps> = ({
             <p style={{ marginTop: '4px', lineHeight: 1.4 }}>Complete any match with a target score set to automatically archive results in this hall of fame.</p>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {matchHistory.map((match) => {
-              const isSelected = selectedMatchIds.includes(match.id);
-              const cardMarkup = (
-                <div 
-                  className={`glass-card animate-scalein ${isSelected ? 'selected' : ''}`} 
-                  onClick={() => {
-                    if (isEditMode) {
-                      handleToggleSelect(match.id);
-                    }
-                  }}
-                  style={{ 
-                    padding: '16px', 
-                    display: 'flex', 
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: '12px',
-                    width: '100%',
-                    cursor: isEditMode ? 'pointer' : 'default',
-                    borderLeft: `3px solid ${match.winnerId ? `hsl(var(${match.players.find(p => p.name === match.winnerName)?.colorVar || '--accent-primary'}))` : 'hsl(var(--accent-primary))'}`,
-                    background: isSelected 
-                      ? 'linear-gradient(90deg, hsl(var(--accent-primary) / 0.08) 0%, hsl(var(--bg-card) / 0.9) 100%)' 
-                      : `linear-gradient(90deg, hsl(var(${match.players.find(p => p.name === match.winnerName)?.colorVar || '--accent-primary'} / 0.04) 0%, hsl(var(--bg-card)) 100%)`
-                  }}
-                >
-                  {/* Edit mode selection checkmark */}
-                  {isEditMode && (
-                    <div style={{ color: isSelected ? 'hsl(var(--accent-primary))' : 'hsl(var(--text-muted))', display: 'flex', alignItems: 'center' }}>
-                      {isSelected ? <CheckSquare size={18} /> : <Square size={18} />}
-                    </div>
-                  )}
+          <>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {(isHistoryExpanded ? matchHistory : matchHistory.slice(0, 5)).map((match) => {
+                const isSelected = selectedMatchIds.includes(match.id);
+                const cardMarkup = (
+                  <div 
+                    className={`glass-card animate-scalein ${isSelected ? 'selected' : ''}`} 
+                    onClick={() => {
+                      if (isEditMode) {
+                        handleToggleSelect(match.id);
+                      }
+                    }}
+                    style={{ 
+                      padding: '16px', 
+                      display: 'flex', 
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: '12px',
+                      width: '100%',
+                      cursor: isEditMode ? 'pointer' : 'default',
+                      borderLeft: `3px solid ${match.winnerId ? `hsl(var(${match.players.find(p => p.name === match.winnerName)?.colorVar || '--accent-primary'}))` : 'hsl(var(--accent-primary))'}`,
+                      background: isSelected 
+                        ? 'linear-gradient(90deg, hsl(var(--accent-primary) / 0.08) 0%, hsl(var(--bg-card) / 0.9) 100%)' 
+                        : `linear-gradient(90deg, hsl(var(${match.players.find(p => p.name === match.winnerName)?.colorVar || '--accent-primary'} / 0.04) 0%, hsl(var(--bg-card)) 100%)`
+                    }}
+                  >
+                    {/* Edit mode selection checkmark */}
+                    {isEditMode && (
+                      <div style={{ color: isSelected ? 'hsl(var(--accent-primary))' : 'hsl(var(--text-muted))', display: 'flex', alignItems: 'center' }}>
+                        {isSelected ? <CheckSquare size={18} /> : <Square size={18} />}
+                      </div>
+                    )}
 
-                  {/* Card Content Core */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1 }}>
-                    {/* Header: Preset and Date */}
-                    <div className="flex-row-center" style={{ justifyContent: 'space-between', fontSize: '12px' }}>
-                      <span style={{ fontWeight: 800, color: 'hsl(var(--text-primary))', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                        {match.presetName}
-                      </span>
-                      <span style={{ color: 'hsl(var(--text-muted))' }}>
-                        {match.date}
-                      </span>
-                    </div>
+                    {/* Card Content Core */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1 }}>
+                      {/* Header: Preset and Date */}
+                      <div className="flex-row-center" style={{ justifyContent: 'space-between', fontSize: '12px' }}>
+                        <span style={{ fontWeight: 800, color: 'hsl(var(--text-primary))', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                          {match.presetName}
+                        </span>
+                        <span style={{ color: 'hsl(var(--text-muted))' }}>
+                          {match.date}
+                        </span>
+                      </div>
 
-                    {/* Winner announcement */}
-                    <div className="flex-row-center" style={{ gap: '6px', fontSize: '13px' }}>
-                      <Trophy size={14} style={{ color: 'hsl(var(--accent-warning))' }} />
-                      <span>
-                        Winner:{' '}
-                        <strong style={{ color: `hsl(var(${match.players.find(p => p.name === match.winnerName)?.colorVar || '--text-primary'}))` }}>
-                          {match.winnerName}
-                        </strong>
-                      </span>
-                    </div>
+                      {/* Winner announcement */}
+                      <div className="flex-row-center" style={{ gap: '6px', fontSize: '13px' }}>
+                        <Trophy size={14} style={{ color: 'hsl(var(--accent-warning))' }} />
+                        <span>
+                          Winner:{' '}
+                          <strong style={{ color: `hsl(var(${match.players.find(p => p.name === match.winnerName)?.colorVar || '--text-primary'}))` }}>
+                            {match.winnerName}
+                          </strong>
+                        </span>
+                      </div>
 
-                    {/* Scoreboard grid for this match */}
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px' }}>
-                      {match.players.map((player, pIdx) => {
-                        const isWinner = player.name === match.winnerName;
-                        return (
-                          <div 
-                            key={pIdx} 
-                            style={{ 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              gap: '6px', 
-                              background: 'hsl(var(--bg-app) / 0.5)', 
-                              padding: '4px 10px', 
-                              borderRadius: '20px',
-                              fontSize: '12px',
-                              border: isWinner ? '1px solid hsl(var(--accent-warning) / 0.3)' : '1px solid transparent'
-                            }}
-                          >
+                      {/* Scoreboard grid for this match */}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px' }}>
+                        {match.players.map((player, pIdx) => {
+                          const isWinner = player.name === match.winnerName;
+                          return (
                             <div 
+                              key={pIdx} 
                               style={{ 
-                                width: '8px', 
-                                height: '8px', 
-                                borderRadius: '50%', 
-                                background: `hsl(var(${player.colorVar}))`,
-                                boxShadow: `0 0 6px hsl(var(${player.colorVar}) / 0.5)`
-                              }} 
-                            />
-                            <span style={{ color: 'hsl(var(--text-secondary))' }}>{player.name}</span>
-                            <strong style={{ fontFamily: 'var(--font-mono)' }}>{player.score}</strong>
-                          </div>
-                        );
-                      })}
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '6px', 
+                                background: 'hsl(var(--bg-app) / 0.5)', 
+                                padding: '4px 10px', 
+                                borderRadius: '20px',
+                                fontSize: '12px',
+                                border: isWinner ? '1px solid hsl(var(--accent-warning) / 0.3)' : '1px solid transparent'
+                              }}
+                            >
+                              <div 
+                                style={{ 
+                                  width: '8px', 
+                                  height: '8px', 
+                                  borderRadius: '50%', 
+                                  background: `hsl(var(${player.colorVar}))`,
+                                  boxShadow: `0 0 6px hsl(var(${player.colorVar}) / 0.5)`
+                                }} 
+                              />
+                              <span style={{ color: 'hsl(var(--text-secondary))' }}>{player.name}</span>
+                              <strong style={{ fontFamily: 'var(--font-mono)' }}>{player.score}</strong>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
+
+                    {/* Inline Delete Button (only in Edit mode for quick single delete fallback) */}
+                    {isEditMode && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm(`Are you sure you want to delete this match?`)) {
+                            if (onDeleteMatches) onDeleteMatches([match.id]);
+                          }
+                        }}
+                        className="btn-premium"
+                        style={{ padding: '6px', color: 'hsl(var(--accent-danger))', borderColor: 'hsl(var(--accent-danger) / 0.2)' }}
+                        title="Delete single match"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
                   </div>
+                );
 
-                  {/* Inline Delete Button (only in Edit mode for quick single delete fallback) */}
-                  {isEditMode && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (window.confirm(`Are you sure you want to delete this match?`)) {
-                          if (onDeleteMatches) onDeleteMatches([match.id]);
-                        }
-                      }}
-                      className="btn-premium"
-                      style={{ padding: '6px', color: 'hsl(var(--accent-danger))', borderColor: 'hsl(var(--accent-danger) / 0.2)' }}
-                      title="Delete single match"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  )}
-                </div>
-              );
+                return (
+                  <SwipeableItem 
+                    key={match.id}
+                    disabled={isEditMode} // Disable swipe gesture in edit mode to avoid touch conflicts!
+                    onDelete={() => {
+                      if (onDeleteMatches) {
+                        onDeleteMatches([match.id]);
+                      }
+                    }}
+                  >
+                    {cardMarkup}
+                  </SwipeableItem>
+                );
+              })}
+            </div>
 
-              return (
-                <SwipeableItem 
-                  key={match.id}
-                  disabled={isEditMode} // Disable swipe gesture in edit mode to avoid touch conflicts!
-                  onDelete={() => {
-                    if (onDeleteMatches) {
-                      onDeleteMatches([match.id]);
-                    }
-                  }}
-                >
-                  {cardMarkup}
-                </SwipeableItem>
-              );
-            })}
+            {matchHistory.length > 5 && (
+              <button
+                type="button"
+                onClick={() => {
+                  sound.playTick();
+                  setIsHistoryExpanded(!isHistoryExpanded);
+                }}
+                className="btn-premium"
+                style={{ 
+                  margin: '8px auto 0 auto', 
+                  padding: '6px 12px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '6px', 
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  borderRadius: '8px',
+                  width: 'fit-content',
+                  borderColor: 'hsl(var(--accent-secondary) / 0.3)',
+                  color: 'hsl(var(--text-secondary))'
+                }}
+              >
+                {isHistoryExpanded ? 'Show Less' : `Expand Archive (${matchHistory.length - 5} more)`}
+              </button>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Live Chart Canvas */}
+      <div className="glass-panel" style={{ padding: '20px' }}>
+        <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '15px' }}>
+          <TrendingUp size={18} style={{ color: 'hsl(var(--accent-secondary))' }} />
+          Score Progression
+        </h3>
+        
+        {hasActiveData ? renderSVGChart() : (
+          <div style={{ padding: '24px 12px', textAlign: 'center', color: 'hsl(var(--text-muted))', fontSize: '13px' }}>
+            No active game scoring yet. Add rounds in the game tab to populate real-time charts!
           </div>
         )}
       </div>

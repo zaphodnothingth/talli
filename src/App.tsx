@@ -67,6 +67,7 @@ function App() {
   
   // Game Play State
   const [scores, setScores] = useState<Record<string, number>>({});
+  const [versusScores, setVersusScores] = useState<Record<string, number>>({});
   const [rounds, setRounds] = useState<any[]>([]);
   const [targetScore, setTargetScore] = useState<number>(100);
 
@@ -293,7 +294,7 @@ function App() {
     setTargetScore(preset.targetScore);
     
     // Reset/Setup game scores
-    if (rounds.length > 0 || Object.keys(scores).some(k => scores[k] > 0)) {
+    if (rounds.length > 0 || Object.keys(scores).some(k => scores[k] > 0) || Object.keys(versusScores).some(k => versusScores[k] > 0)) {
       if (confirm(`Switch to '${preset.name}' and reset current scores?`)) {
         setRounds([]);
         const reset: Record<string, number> = {};
@@ -301,6 +302,7 @@ function App() {
           reset[id] = 0;
         });
         setScores(reset);
+        setVersusScores(reset);
       }
     } else {
       // Clear history cleanly without prompt since it is empty
@@ -310,6 +312,7 @@ function App() {
         reset[id] = 0;
       });
       setScores(reset);
+      setVersusScores(reset);
     }
   };
 
@@ -691,6 +694,7 @@ function App() {
       reset[id] = 0;
     });
     setScores(reset);
+    setVersusScores(reset);
   };
 
   return (
@@ -798,7 +802,7 @@ function App() {
         {activeTab === 'counters' && (
           <QuickCounter
             activePlayers={activePlayers}
-            totalScores={totalScores}
+            totalScores={scores}
             onAdjustScore={handleAdjustScore}
             onResetScores={handleResetScores}
             onMatchCompleted={handleTallyMatchCompleted}
@@ -824,13 +828,20 @@ function App() {
         {activeTab === 'versus' && (
           <VersusGame
             activePlayers={activePlayers}
-            scores={totalScores}
+            scores={versusScores}
             onUpdateScore={(playerId, newScore) => {
-               // For Versus, which replaces scores directly, we calculate delta from total
-               const delta = newScore - (totalScores[playerId] || 0);
-               handleAdjustScore(playerId, delta);
+               setVersusScores(prev => ({
+                 ...prev,
+                 [playerId]: newScore
+               }));
             }}
-            onResetScores={handleResetScores}
+            onResetScores={() => {
+               const reset: Record<string, number> = {};
+               activePlayerIds.forEach(id => {
+                 reset[id] = 0;
+               });
+               setVersusScores(reset);
+            }}
             onMatchCompleted={handleVersusMatchCompleted}
           />
         )}
@@ -897,74 +908,80 @@ function App() {
           <span>Players</span>
         </button>
 
-        <button
-          style={{
-            background: 'transparent',
-            border: 'none',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '4px',
-            color: activeTab === 'counters' ? 'hsl(var(--accent-primary))' : 'hsl(var(--text-muted))',
-            cursor: 'pointer',
-            fontSize: '10px',
-            fontWeight: 700,
-            transition: 'color 0.2s'
-          }}
-          onClick={() => {
-            sound.playTick();
-            setActiveTab('counters');
-          }}
-        >
-          <Hash size={20} />
-          <span>Tally</span>
-        </button>
+        {(activePreset.mode === 'counters' || activePreset.mode === 'rounds') && (
+          <button
+            style={{
+              background: 'transparent',
+              border: 'none',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '4px',
+              color: activeTab === 'counters' ? 'hsl(var(--accent-primary))' : 'hsl(var(--text-muted))',
+              cursor: 'pointer',
+              fontSize: '10px',
+              fontWeight: 700,
+              transition: 'color 0.2s'
+            }}
+            onClick={() => {
+              sound.playTick();
+              setActiveTab('counters');
+            }}
+          >
+            <Hash size={20} />
+            <span>Tally</span>
+          </button>
+        )}
 
-        <button
-          style={{
-            background: 'transparent',
-            border: 'none',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '4px',
-            color: activeTab === 'rounds' ? 'hsl(var(--accent-primary))' : 'hsl(var(--text-muted))',
-            cursor: 'pointer',
-            fontSize: '10px',
-            fontWeight: 700,
-            transition: 'color 0.2s'
-          }}
-          onClick={() => {
-            sound.playTick();
-            setActiveTab('rounds');
-          }}
-        >
-          <RotateCcw size={20} />
-          <span>Rounds</span>
-        </button>
+        {activePreset.mode === 'rounds' && (
+          <button
+            style={{
+              background: 'transparent',
+              border: 'none',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '4px',
+              color: activeTab === 'rounds' ? 'hsl(var(--accent-primary))' : 'hsl(var(--text-muted))',
+              cursor: 'pointer',
+              fontSize: '10px',
+              fontWeight: 700,
+              transition: 'color 0.2s'
+            }}
+            onClick={() => {
+              sound.playTick();
+              setActiveTab('rounds');
+            }}
+          >
+            <RotateCcw size={20} />
+            <span>Rounds</span>
+          </button>
+        )}
 
-        <button
-          style={{
-            background: 'transparent',
-            border: 'none',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '4px',
-            color: activeTab === 'versus' ? 'hsl(var(--accent-primary))' : 'hsl(var(--text-muted))',
-            cursor: 'pointer',
-            fontSize: '10px',
-            fontWeight: 700,
-            transition: 'color 0.2s'
-          }}
-          onClick={() => {
-            sound.playTick();
-            setActiveTab('versus');
-          }}
-        >
-          <ChevronRight size={20} style={{ transform: 'rotate(-45deg)' }} />
-          <span>Versus</span>
-        </button>
+        {activePreset.mode === 'versus' && (
+          <button
+            style={{
+              background: 'transparent',
+              border: 'none',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '4px',
+              color: activeTab === 'versus' ? 'hsl(var(--accent-primary))' : 'hsl(var(--text-muted))',
+              cursor: 'pointer',
+              fontSize: '10px',
+              fontWeight: 700,
+              transition: 'color 0.2s'
+            }}
+            onClick={() => {
+              sound.playTick();
+              setActiveTab('versus');
+            }}
+          >
+            <ChevronRight size={20} style={{ transform: 'rotate(-45deg)' }} />
+            <span>Versus</span>
+          </button>
+        )}
 
         <button
           style={{
