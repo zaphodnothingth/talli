@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.zaphodnothingth.talli",
+      "sha256_cert_fingerprints": [
+        "82:B4:C9:12:54:21:4C:32:2D:07:D5:6B:68:40:E4:6B:52:CE:F1:78:0B:7D:7D:F0:EE:A4:C8:2B:19:B4:44:58"
+      ]
+    }
+  }
+]
